@@ -6,6 +6,7 @@ const FeedPage = {
   limit: 25,
   hasMore: true,
   loading: false,
+  scrollHandler: null,
 
   render(container) {
     container.innerHTML = `
@@ -27,7 +28,7 @@ const FeedPage = {
   },
 
   attachEventListeners() {
-    window.addEventListener('scroll', () => {
+    this.scrollHandler = () => {
       if (this.hasMore && !this.loading) {
         const scrollHeight = document.documentElement.scrollHeight;
         const scrollTop = document.documentElement.scrollTop;
@@ -36,7 +37,15 @@ const FeedPage = {
           this.loadMorePosts();
         }
       }
-    });
+    };
+    window.addEventListener('scroll', this.scrollHandler);
+  },
+
+  destroy() {
+    if (this.scrollHandler) {
+      window.removeEventListener('scroll', this.scrollHandler);
+      this.scrollHandler = null;
+    }
   },
 
   async loadPosts() {

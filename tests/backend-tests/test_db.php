@@ -4,12 +4,14 @@ ini_set('display_errors', 1);
 
 header('Content-Type: application/json');
 
+$email = getenv('TEST_EMAIL') ?: 'test@example.com';
+
 try {
     $pdo = new PDO('sqlite:userdata.db');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
     $stmt = $pdo->prepare('SELECT id, email, password FROM users WHERE LOWER(email) = LOWER(?)');
-    $stmt->execute(['davefruin@gmail.com']);
+    $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($user) {

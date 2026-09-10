@@ -118,10 +118,8 @@ async function checkNotifications() {
   }
 
   try {
-    const result = await api.getNotifications();
-    if (result.notifications) {
-      Store.setNotificationCount(result.notifications.length);
-    }
+    const result = await api.getUnseenNotificationCount();
+    Store.setNotificationCount(result.count);
   } catch (err) {
     console.log('Notification check error:', err.message);
   }

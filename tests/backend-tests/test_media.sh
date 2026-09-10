@@ -1,9 +1,9 @@
 #!/bin/bash
 # test_media.sh - Test Media Upload API
 
-BASE_URL="https://dev.davidfruin.com"
-EMAIL="davefruin@gmail.com"
-PASSWORD="CC6iQCfuZlc5jD&3xhvFL87Xw"
+BASE_URL="${TEST_BASE_URL:-https://dev.davidfruin.com}"
+EMAIL="${TEST_EMAIL:?Set TEST_EMAIL environment variable}"
+PASSWORD="${TEST_PASSWORD:?Set TEST_PASSWORD environment variable}"
 
 get_fresh_jwt() {
   # Logout first to clear old JWT, then login fresh

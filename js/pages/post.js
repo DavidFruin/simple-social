@@ -130,24 +130,16 @@ const PostPage = {
     }
 
     empty?.classList.add('hidden');
+    container.innerHTML = '';
 
-    container.innerHTML = this.comments.map(comment => {
-      const user = Store.getUser();
-      const isOwner = user && comment.user_id === user.id;
-      const isPostOwner = user && (this.post.userId === user.id || this.post.userID === user.id);
-      const canDelete = isOwner || isPostOwner;
+    const user = Store.getUser();
+    const isPostOwner = user && (this.post.userId === user.id || this.post.userID === user.id);
 
-      return `
-        <div class="comment" data-comment-id="${comment.id}">
-          <div class="comment-header">
-            <a href="#/profile/${comment.user_id}" class="comment-user">${escapeHtml(comment.user_email || 'User')}</a>
-            <span class="comment-time">${formatTimestamp(comment.created_at)}</span>
-            ${canDelete ? '<button class="btn-delete-comment" data-comment-id="' + comment.id + '">Delete</button>' : ''}
-          </div>
-          <div class="comment-body">${escapeHtml(comment.text)}</div>
-        </div>
-      `;
-    }).join('');
+    this.comments.forEach(comment => {
+      const canDelete = isPostOwner || comment.user_id === user?.id;
+      const el = createCommentElement(comment, { showDeleteButton: canDelete });
+      container.appendChild(el);
+    });
 
     this.attachCommentEventListeners();
   },

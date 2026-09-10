@@ -1,9 +1,14 @@
 // test_auth.js - Node.js Authenticated API Tests (HTTPS)
 const https = require('https');
 
-const BASE_URL = 'https://dev.davidfruin.com';
-const TEST_EMAIL = 'davefruin@gmail.com';
-const TEST_PASSWORD = 'CC6iQCfuZlc5jD&3xhvFL87Xw';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://dev.davidfruin.com';
+const TEST_EMAIL = process.env.TEST_EMAIL;
+const TEST_PASSWORD = process.env.TEST_PASSWORD;
+
+if (!TEST_EMAIL || !TEST_PASSWORD) {
+  console.error('Error: Set TEST_EMAIL and TEST_PASSWORD environment variables');
+  process.exit(1);
+}
 
 let JWT = null;
 

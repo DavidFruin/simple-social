@@ -15,6 +15,7 @@ const Router = {
     settings: { path: '/settings', requiresAuth: true },
     search: { path: '/search', requiresAuth: true }
   },
+  currentPage: null,
 
   init() {
     window.addEventListener('hashchange', () => this.handleHashChange());
@@ -62,38 +63,73 @@ const Router = {
     const container = document.getElementById('main');
     if (!container) return;
 
+    if (this.currentPage && typeof this.currentPage.destroy === 'function') {
+      this.currentPage.destroy();
+    }
+
     container.innerHTML = '';
+    this.currentPage = null;
 
     switch (route.page) {
       case 'login':
-        if (typeof LoginPage !== 'undefined') LoginPage.render(container);
+        if (typeof LoginPage !== 'undefined') {
+          LoginPage.render(container);
+          this.currentPage = LoginPage;
+        }
         break;
       case 'register':
-        if (typeof RegisterPage !== 'undefined') RegisterPage.render(container);
+        if (typeof RegisterPage !== 'undefined') {
+          RegisterPage.render(container);
+          this.currentPage = RegisterPage;
+        }
         break;
       case 'reset-password':
-        if (typeof ResetPasswordPage !== 'undefined') ResetPasswordPage.render(container);
+        if (typeof ResetPasswordPage !== 'undefined') {
+          ResetPasswordPage.render(container);
+          this.currentPage = ResetPasswordPage;
+        }
         break;
       case 'feed':
-        if (typeof FeedPage !== 'undefined') FeedPage.render(container);
+        if (typeof FeedPage !== 'undefined') {
+          FeedPage.render(container);
+          this.currentPage = FeedPage;
+        }
         break;
       case 'create-post':
-        if (typeof CreatePostPage !== 'undefined') CreatePostPage.render(container);
+        if (typeof CreatePostPage !== 'undefined') {
+          CreatePostPage.render(container);
+          this.currentPage = CreatePostPage;
+        }
         break;
       case 'profile':
-        if (typeof ProfilePage !== 'undefined') ProfilePage.render(container, route.id);
+        if (typeof ProfilePage !== 'undefined') {
+          ProfilePage.render(container, route.id);
+          this.currentPage = ProfilePage;
+        }
         break;
       case 'post':
-        if (typeof PostPage !== 'undefined') PostPage.render(container, route.id);
+        if (typeof PostPage !== 'undefined') {
+          PostPage.render(container, route.id);
+          this.currentPage = PostPage;
+        }
         break;
       case 'notifications':
-        if (typeof NotificationsPage !== 'undefined') NotificationsPage.render(container);
+        if (typeof NotificationsPage !== 'undefined') {
+          NotificationsPage.render(container);
+          this.currentPage = NotificationsPage;
+        }
         break;
       case 'settings':
-        if (typeof SettingsPage !== 'undefined') SettingsPage.render(container);
+        if (typeof SettingsPage !== 'undefined') {
+          SettingsPage.render(container);
+          this.currentPage = SettingsPage;
+        }
         break;
       case 'search':
-        if (typeof SearchPage !== 'undefined') SearchPage.render(container);
+        if (typeof SearchPage !== 'undefined') {
+          SearchPage.render(container);
+          this.currentPage = SearchPage;
+        }
         break;
       default:
         this.navigate('/feed');

@@ -3,8 +3,11 @@
 
 const { test, expect } = require('@playwright/test');
 
+const TEST_EMAIL = process.env.TEST_EMAIL || 'test@example.com';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:8080';
+
 test('register - invalid email format shows error', async ({ page }) => {
-  await page.goto('http://dev.davidfruin.com/#/register');
+  await page.goto(`${BASE_URL}/#/register`);
   
   // Try to submit with invalid email format
   await page.fill('#email', 'not-an-email');
@@ -15,7 +18,7 @@ test('register - invalid email format shows error', async ({ page }) => {
 });
 
 test('register - empty email shows validation error', async ({ page }) => {
-  await page.goto('http://dev.davidfruin.com/#/register');
+  await page.goto(`${BASE_URL}/#/register`);
   
   // Submit without filling email
   await page.click('#email-form button[type="submit"]');
@@ -25,10 +28,10 @@ test('register - empty email shows validation error', async ({ page }) => {
 });
 
 test('register - already registered email shows error', async ({ page }) => {
-  await page.goto('http://dev.davidfruin.com/#/register');
+  await page.goto(`${BASE_URL}/#/register`);
   
   // Use already registered email - should fail BEFORE trying to send email
-  await page.fill('#email', 'davefruin@gmail.com');
+  await page.fill('#email', TEST_EMAIL);
   await page.click('#email-form button[type="submit"]');
   
   // Should show error about already registered
@@ -36,7 +39,7 @@ test('register - already registered email shows error', async ({ page }) => {
 });
 
 test('register - can go to login page from register', async ({ page }) => {
-  await page.goto('http://dev.davidfruin.com/#/register');
+  await page.goto(`${BASE_URL}/#/register`);
   
   // Click the login link
   await page.click('a[href="#/login"]');
@@ -46,7 +49,7 @@ test('register - can go to login page from register', async ({ page }) => {
 });
 
 test('register - register page loads correctly', async ({ page }) => {
-  await page.goto('http://dev.davidfruin.com/#/register');
+  await page.goto(`${BASE_URL}/#/register`);
   
   // Verify page title
   await expect(page.locator('h1')).toContainText('Create Account');
@@ -62,7 +65,7 @@ test('register - register page loads correctly', async ({ page }) => {
 });
 
 test('register - steps have proper IDs', async ({ page }) => {
-  await page.goto('http://dev.davidfruin.com/#/register');
+  await page.goto(`${BASE_URL}/#/register`);
   
   // Verify all steps exist in DOM
   await expect(page.locator('#step-1')).toHaveClass(/register-step/);
@@ -71,7 +74,7 @@ test('register - steps have proper IDs', async ({ page }) => {
 });
 
 test('register - email form has correct attributes', async ({ page }) => {
-  await page.goto('http://dev.davidfruin.com/#/register');
+  await page.goto(`${BASE_URL}/#/register`);
   
   // Check email input attributes
   const emailInput = page.locator('#email');

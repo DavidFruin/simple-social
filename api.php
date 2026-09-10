@@ -401,6 +401,23 @@ function handle_getNotifications($pdo, $user) {
     respond(good(['notifications' => $stmt->fetchAll(PDO::FETCH_ASSOC)]));
 }
 
+function handle_getUnseenNotificationCount($pdo, $user) {
+    $stmt = $pdo->prepare('SELECT last_notifications_seen_at FROM users WHERE id = ?');
+    $stmt->execute([$user['sub']]);
+    $lastSeen = $stmt->fetchColumn();
+
+    if (!$lastSeen) {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND actor_id != ?');
+        $stmt->execute([$user['sub'], $user['sub']]);
+    } else {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND actor_id != ? AND created_at > ?');
+        $stmt->execute([$user['sub'], $user['sub'], $lastSeen]);
+    }
+
+    $count = (int)$stmt->fetchColumn();
+    respond(good(['count' => $count]));
+}
+
 function handle_markNotificationsSeen($pdo, $user) {
     $stmt = $pdo->prepare('UPDATE users SET last_notifications_seen_at = ? WHERE id = ?');
     $stmt->execute([date('Y-m-d H:i:s'), $user['sub']]);
@@ -881,7 +898,8 @@ $HANDLERS = [
     'sendRegisterOTP' => 'handle_sendRegisterOTP', 'verifyRegisterOTP' => 'handle_verifyRegisterOTP',
     'finishRegister' => 'handle_finishRegister', 'deleteAccount' => 'handle_deleteAccount',
     'getMyFollowers' => 'handle_getMyFollowers', 'getMyFollows' => 'handle_getMyFollows',
-    'getNotifications' => 'handle_getNotifications', 'post' => 'handle_post',
+    'getNotifications' => 'handle_getNotifications', 'getUnseenNotificationCount' => 'handle_getUnseenNotificationCount',
+    'post' => 'handle_post',
     'getMyPosts' => 'handle_getMyPosts', 'getUserPosts' => 'handle_getUserPosts',
     'getUserInfo' => 'handle_getUserInfo', 'getUsers' => 'handle_getUsers', 'getUserEmails' => 'handle_getUserEmails',
     'getMyInfo' => 'handle_getMyInfo', 'fetchFollowedPosts' => 'handle_fetchFollowedPosts',

@@ -243,6 +243,10 @@ const API = {
     return this.call('getNotifications', { offset });
   },
 
+  async getUnseenNotificationCount() {
+    return this.call('getUnseenNotificationCount', {});
+  },
+
   async markNotificationsSeen() {
     return this.call('markNotificationsSeen', {});
   },

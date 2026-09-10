@@ -2,13 +2,17 @@
 
 const { test, expect } = require('@playwright/test');
 
+const TEST_EMAIL = process.env.TEST_EMAIL || 'test@example.com';
+const TEST_PASSWORD = process.env.TEST_PASSWORD || 'testpassword';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:8080';
+
 test.describe('Notifications Page - Mark as Seen & Post Previews', () => {
   
   test.beforeEach(async ({ page }) => {
     // Login before each test
-    await page.goto('http://dev.davidfruin.com/#/login');
-    await page.fill('#email', 'davefruin@gmail.com');
-    await page.fill('#password', 'CC6iQCfuZlc5jD&3xhvFL87Xw');
+    await page.goto(`${BASE_URL}/#/login`);
+    await page.fill('#email', TEST_EMAIL);
+    await page.fill('#password', TEST_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL(/#\/feed/);
   });
