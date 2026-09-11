@@ -4,6 +4,7 @@ const NotificationsPage = {
   postPreviews: {},
 
   render(container) {
+    this.isActive = true;
     container.innerHTML = `
       <div class="page-container">
         <h1>Notifications</h1>
@@ -24,6 +25,10 @@ const NotificationsPage = {
     this.loadNotifications();
   },
 
+  destroy() {
+    this.isActive = false;
+  },
+
   attachEventListeners() {
     document.getElementById('mark-seen-btn')?.addEventListener('click', () => this.handleMarkSeen());
   },
@@ -34,6 +39,7 @@ const NotificationsPage = {
 
     try {
       const result = await api.getNotifications();
+      if (!this.isActive) return;
       this.notifications = result.notifications || [];
 
       if (this.notifications.length === 0) {
@@ -44,6 +50,7 @@ const NotificationsPage = {
 
       empty?.classList.add('hidden');
       await this.loadPostPreviews();
+      if (!this.isActive) return;
       this.renderNotifications();
     } catch (err) {
       container.innerHTML = `<div class="error-message">${escapeHtml(err.message)}</div>`;

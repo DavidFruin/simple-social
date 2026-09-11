@@ -6,6 +6,7 @@ const PostPage = {
   timestamp: null,
 
   render(container, postId) {
+    this.isActive = true;
     if (!postId) {
       container.innerHTML = '<div class="error-message">Post not found</div>';
       return;
@@ -43,6 +44,10 @@ const PostPage = {
     this.loadComments();
   },
 
+  destroy() {
+    this.isActive = false;
+  },
+
   attachEventListeners() {
     document.getElementById('comment-form')?.addEventListener('submit', this.handleCommentSubmit.bind(this));
     document.getElementById('back-link')?.addEventListener('click', (e) => {
@@ -56,6 +61,7 @@ const PostPage = {
 
     try {
       const result = await api.getUserPosts(this.userId);
+      if (!this.isActive) return;
       const posts = result.posts || [];
       this.post = posts.find(p => p.id === this.postId);
 
@@ -113,6 +119,7 @@ const PostPage = {
 
     try {
       const result = await api.getPostComments(this.postId);
+      if (!this.isActive) return;
       this.comments = result.comments || [];
       
       loading?.classList.add('hidden');
@@ -162,9 +169,11 @@ const PostPage = {
     try {
       if (isLiked) {
         await api.unlikePost(postId);
+        if (!this.isActive) return;
         this.post.likes = this.post.likes.filter(l => l.userId !== user?.id);
       } else {
         await api.likePost(postId);
+        if (!this.isActive) return;
         this.post.likes = [...(this.post.likes || []), { userId: user?.id }];
       }
       
@@ -240,6 +249,7 @@ const PostPage = {
 
     try {
       const result = await api.createComment(this.postId, text);
+      if (!this.isActive) return;
       const user = Store.getUser();
       
       this.comments.unshift({
@@ -270,6 +280,7 @@ const PostPage = {
 
     try {
       await api.deleteComment(commentId);
+      if (!this.isActive) return;
       this.comments = this.comments.filter(c => c.id != commentId);
       this.renderComments();
       showSuccess('Comment deleted');

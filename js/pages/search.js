@@ -5,6 +5,7 @@ const SearchPage = {
   followingStatus: {},
 
   render(container) {
+    this.isActive = true;
     container.innerHTML = `
       <div class="page-container">
         <h1>Find Users</h1>
@@ -23,6 +24,10 @@ const SearchPage = {
 
     this.loadAllUsers();
     this.attachEventListeners();
+  },
+
+  destroy() {
+    this.isActive = false;
   },
 
   attachEventListeners() {
@@ -62,6 +67,7 @@ const SearchPage = {
 
       loading?.classList.add('hidden');
       await this.checkFollowingStatus();
+      if (!this.isActive) return;
       this.renderUsersList(this.users);
     } catch (err) {
       loading?.classList.add('hidden');

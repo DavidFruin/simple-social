@@ -8,6 +8,7 @@ const ProfilePage = {
   followingCount: 0,
 
   render(container, userId) {
+    this.isActive = true;
     const currentUser = Store.getUser();
     this.isOwnProfile = !userId || userId === currentUser?.id || userId === currentUser?.userId;
     this.userId = this.isOwnProfile ? currentUser?.id : userId;
@@ -32,6 +33,10 @@ const ProfilePage = {
     this.loadProfile();
   },
 
+  destroy() {
+    this.isActive = false;
+  },
+
   async loadProfile() {
     if (!this.userId) {
       this.showError('User not found');
@@ -50,6 +55,8 @@ const ProfilePage = {
         api.getFollows(this.userId)
       ]);
 
+      if (!this.isActive) return;
+
       this.user = userInfo;
       this.posts = posts.posts || [];
       this.followersCount = (followers.followers || []).length;
@@ -59,6 +66,7 @@ const ProfilePage = {
       if (postIds.length > 0) {
         try {
           const result = await api.getPostCommentCounts(postIds);
+          if (!this.isActive) return;
           this.commentCounts = result.counts;
         } catch (err) {
           console.error('Failed to load comment counts:', err);
@@ -203,9 +211,11 @@ container.innerHTML = this.posts.map(post => {
     try {
       if (isLiked) {
         await api.unlikePost(postId);
+        if (!this.isActive) return;
         post.likes = post.likes.filter(l => l.userId !== user?.id);
       } else {
         await api.likePost(postId);
+        if (!this.isActive) return;
         post.likes = [...(post.likes || []), { userId: user?.id }];
       }
       
@@ -223,6 +233,7 @@ container.innerHTML = this.posts.map(post => {
 
     try {
       await api.deletePost(postId);
+      if (!this.isActive) return;
       this.posts = this.posts.filter(p => p.id !== postId);
       this.renderPosts();
       showSuccess('Post deleted');
@@ -272,8 +283,9 @@ container.innerHTML = this.posts.map(post => {
 
   showError(message) {
     const header = document.getElementById('profile-header');
-    header.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
-    document.getElementById('posts-container').innerHTML = '';
+    if (header) header.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+    const postsContainer = document.getElementById('posts-container');
+    if (postsContainer) postsContainer.innerHTML = '';
   },
 
   attachDropdownListeners() {

@@ -155,9 +155,11 @@ const FeedPage = {
     try {
       if (isLiked) {
         await api.unlikePost(postId);
+        if (!this.isActive) return;
         post.likes = post.likes.filter(l => l.userId !== user?.id);
       } else {
         await api.likePost(postId);
+        if (!this.isActive) return;
         post.likes = [...(post.likes || []), { userId: user?.id, timestamp: new Date().toISOString() }];
       }
       
@@ -175,6 +177,7 @@ const FeedPage = {
 
     try {
       await api.deletePost(postId);
+      if (!this.isActive) return;
       this.posts = this.posts.filter(p => p.id !== postId);
       this.renderPosts();
       showSuccess('Post deleted');
