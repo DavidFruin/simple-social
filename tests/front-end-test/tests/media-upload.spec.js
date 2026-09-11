@@ -4,14 +4,18 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 
+const TEST_EMAIL = process.env.TEST_EMAIL || 'test@example.com';
+const TEST_PASSWORD = process.env.TEST_PASSWORD || 'testpassword';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://dev.davidfruin.com';
+
 const TEST_IMAGE_PATH = '/tmp/test_image.webp';
 const TEST_VIDEO_PATH = '/tmp/test_video.mp4';
 const TEST_AUDIO_PATH = '/tmp/test_audio.mp3';
 
 async function login(page) {
-  await page.goto('http://dev.davidfruin.com/#/login');
-  await page.fill('#email', 'davefruin@gmail.com');
-  await page.fill('#password', 'CC6iQCfuZlc5jD&3xhvFL87Xw');
+  await page.goto(`${BASE_URL}/#/login`);
+  await page.fill('#email', TEST_EMAIL);
+  await page.fill('#password', TEST_PASSWORD);
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL(/#\/feed/);
 }
@@ -20,7 +24,6 @@ function createTestFile(filePath, type) {
   if (fs.existsSync(filePath)) return;
   
   if (type === 'image') {
-    // Create a minimal valid WebP file (1x1 pixel)
     const webpHeader = Buffer.from([
       0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
       0x56, 0x49, 0x53, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -28,13 +31,11 @@ function createTestFile(filePath, type) {
     ]);
     fs.writeFileSync(filePath, webpHeader);
   } else if (type === 'video') {
-    // Create minimal MP4 file
     fs.writeFileSync(filePath, Buffer.from([
       0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34, 0x32,
       0x00, 0x00, 0x00, 0x00, 0x6D, 0x70, 0x34, 0x32, 0x69, 0x73, 0x6F, 0x6D
     ]));
   } else if (type === 'audio') {
-    // Create minimal MP3 file
     fs.writeFileSync(filePath, Buffer.from([
       0xFF, 0xFB, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     ]));
@@ -42,8 +43,8 @@ function createTestFile(filePath, type) {
 }
 
 async function logout(page) {
-  await page.goto('http://dev.davidfruin.com/#/feed');
-  const logoutBtn = page.locator('button:has-text("Logout")');
+  await page.goto(`${BASE_URL}/#/feed`);
+  const logoutBtn = page.locator('a:has-text("Logout")');
   if (await logoutBtn.isVisible()) {
     await logoutBtn.click();
     await page.waitForURL(/#\/login/);
@@ -63,7 +64,7 @@ test.describe('Media Upload', () => {
 
   test('create-post page shows media upload section', async ({ page }) => {
     await login(page);
-    await page.goto('http://dev.davidfruin.com/#/create-post');
+    await page.goto(`${BASE_URL}/#/create-post`);
     
     await expect(page.locator('#media-input')).toBeHidden();
     await expect(page.locator('#select-media-btn')).toBeVisible();
@@ -72,7 +73,7 @@ test.describe('Media Upload', () => {
 
   test('upload section shows correct buttons', async ({ page }) => {
     await login(page);
-    await page.goto('http://dev.davidfruin.com/#/create-post');
+    await page.goto(`${BASE_URL}/#/create-post`);
     
     const selectBtn = page.locator('#select-media-btn');
     await expect(selectBtn).toBeVisible();
@@ -81,7 +82,7 @@ test.describe('Media Upload', () => {
 
   test('post without media works', async ({ page }) => {
     await login(page);
-    await page.goto('http://dev.davidfruin.com/#/create-post');
+    await page.goto(`${BASE_URL}/#/create-post`);
     
     await page.fill('#post-text', 'Post without media');
     await page.click('button[type="submit"]');
@@ -90,7 +91,7 @@ test.describe('Media Upload', () => {
 
   test('empty media status clears on page load', async ({ page }) => {
     await login(page);
-    await page.goto('http://dev.davidfruin.com/#/create-post');
+    await page.goto(`${BASE_URL}/#/create-post`);
     
     const status = page.locator('#media-status');
     await expect(status).toHaveText('');
@@ -107,7 +108,7 @@ test.describe('Media Viewer', () => {
   });
 
   test('media viewer overlay exists in DOM', async ({ page }) => {
-    await page.goto('http://dev.davidfruin.com/#/feed');
+    await page.goto(`${BASE_URL}/#/feed`);
     
     const overlay = page.locator('.media-viewer-overlay');
     await expect(overlay).toBeAttached();
@@ -115,7 +116,7 @@ test.describe('Media Viewer', () => {
   });
 
   test('close button exists in viewer', async ({ page }) => {
-    await page.goto('http://dev.davidfruin.com/#/feed');
+    await page.goto(`${BASE_URL}/#/feed`);
     
     const closeBtn = page.locator('.media-viewer-close');
     await expect(closeBtn).toBeAttached();
@@ -132,13 +133,13 @@ test.describe('Post Media Display', () => {
   });
 
   test('post card shows media section when present', async ({ page }) => {
-    await page.goto('http://dev.davidfruin.com/#/create-post');
+    await page.goto(`${BASE_URL}/#/create-post`);
     
     await page.fill('#post-text', 'Post for media display test');
     await page.click('button[type="submit"]');
     await page.waitForTimeout(500);
     
-    await page.goto('http://dev.davidfruin.com/#/feed');
+    await page.goto(`${BASE_URL}/#/feed`);
     await page.waitForTimeout(500);
     
     const postCard = page.locator('.post-card').first();
