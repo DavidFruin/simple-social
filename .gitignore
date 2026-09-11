@@ -3,3 +3,5 @@
 node_modules/
 tmp/
 .env
+media/
+tests/front-end-test/test-results/
