@@ -18,7 +18,7 @@ const PostPage = {
 
     container.innerHTML = `
       <div class="page-container">
-        <a href="#/feed" class="back-link">← Back to Feed</a>
+        <a href="javascript:void(0)" class="back-link" id="back-link">← Back</a>
         
         <div id="post-container">
           <div class="loading">Loading post...</div>
@@ -45,6 +45,10 @@ const PostPage = {
 
   attachEventListeners() {
     document.getElementById('comment-form')?.addEventListener('submit', this.handleCommentSubmit.bind(this));
+    document.getElementById('back-link')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      history.back();
+    });
   },
 
   async loadPost() {
@@ -133,10 +137,9 @@ const PostPage = {
     container.innerHTML = '';
 
     const user = Store.getUser();
-    const isPostOwner = user && (this.post.userId === user.id || this.post.userID === user.id);
 
     this.comments.forEach(comment => {
-      const canDelete = isPostOwner || comment.user_id === user?.id;
+      const canDelete = comment.user_id === user?.id;
       const el = createCommentElement(comment, { showDeleteButton: canDelete });
       container.appendChild(el);
     });

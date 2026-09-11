@@ -93,9 +93,10 @@ function escapeHtml(unsafe) {
 }
 
 function formatTimestamp(timestamp) {
-  if (!timestamp) return '';
+  if (!timestamp || timestamp === 'Unknown') return '';
   
   const date = new Date(timestamp.replace(' ', 'T'));
+  if (isNaN(date.getTime())) return '';
   const now = new Date();
   const diff = (now - date) / 1000;
 

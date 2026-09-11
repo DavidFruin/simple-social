@@ -39,12 +39,10 @@ const NotificationsPage = {
       if (this.notifications.length === 0) {
         container.innerHTML = '';
         empty?.classList.remove('hidden');
-        Store.setNotificationCount(0);
         return;
       }
 
       empty?.classList.add('hidden');
-      Store.setNotificationCount(0);
       await this.loadPostPreviews();
       this.renderNotifications();
     } catch (err) {
@@ -82,6 +80,7 @@ const NotificationsPage = {
 
     try {
       await api.markNotificationsSeen();
+      Store.setNotificationCount(0);
       showSuccess('Notifications marked as seen');
       this.loadNotifications();
     } catch (err) {

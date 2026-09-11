@@ -9,6 +9,7 @@ const FeedPage = {
   scrollHandler: null,
 
   render(container) {
+    this.isActive = true;
     container.innerHTML = `
       <div class="page-container">
         <h1>News Feed</h1>
@@ -42,6 +43,7 @@ const FeedPage = {
   },
 
   destroy() {
+    this.isActive = false;
     if (this.scrollHandler) {
       window.removeEventListener('scroll', this.scrollHandler);
       this.scrollHandler = null;
@@ -69,6 +71,8 @@ const FeedPage = {
     try {
       const result = await api.fetchFollowedPosts(offset, this.limit);
       
+      if (!this.isActive) return;
+      
       if (offset === 0) {
         this.posts = result.posts || [];
       } else {
@@ -76,12 +80,13 @@ const FeedPage = {
       }
       
       this.hasMore = result.hasMore;
-      this.offset = offset + this.posts.length;
+      this.offset = this.posts.length;
       
       const postIds = this.posts.map(p => p.id).filter(id => id);
       if (postIds.length > 0) {
         try {
           const result = await api.getPostCommentCounts(postIds);
+          if (!this.isActive) return;
           this.commentCounts = { ...this.commentCounts, ...result.counts };
         } catch (err) {
           console.error('Failed to load comment counts:', err);
