@@ -131,6 +131,7 @@ function showError(message, container = document.getElementById('main')) {
   errorDiv.textContent = message;
   container.prepend(errorDiv);
   setTimeout(() => errorDiv.remove(), 5000);
+  if (typeof Logger !== 'undefined') Logger.error(message);
 }
 
 function showSuccess(message, container = document.getElementById('main')) {
@@ -145,3 +146,16 @@ document.addEventListener('DOMContentLoaded', init);
 window.showError = showError;
 window.showSuccess = showSuccess;
 window.updateHeader = updateHeaderState;
+
+window.onerror = function(msg, url, line, col, error) {
+  if (typeof Logger !== 'undefined') {
+    Logger.error(msg, 'url=' + url + ' line=' + line + ' col=' + col);
+  }
+};
+
+window.onunhandledrejection = function(event) {
+  if (typeof Logger !== 'undefined') {
+    const msg = event.reason ? (event.reason.message || String(event.reason)) : 'Unhandled promise rejection';
+    Logger.error(msg);
+  }
+};

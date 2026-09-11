@@ -3,4 +3,5 @@
 
 $CONFIG = [
     'debug' => true,
+    'test_mode' => true,
 ];

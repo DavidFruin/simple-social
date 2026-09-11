@@ -40,6 +40,7 @@ const API = {
       return json;
     } catch (error) {
       console.error('API Error:', error);
+      if (typeof Logger !== 'undefined') Logger.error('API: ' + action + ' - ' + error.message);
       throw error;
     }
   },
@@ -177,6 +178,7 @@ const API = {
       return json;
     } catch (error) {
       console.error('Upload Error:', error);
+      if (typeof Logger !== 'undefined') Logger.error('Upload: ' + error.message);
       throw error;
     }
   },

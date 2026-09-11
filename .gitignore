@@ -5,3 +5,4 @@ tmp/
 .env
 media/
 tests/front-end-test/test-results/
+logs/

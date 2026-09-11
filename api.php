@@ -1,6 +1,7 @@
 <?php
 // api.php - Simple Social API (max 3 levels indentation)
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/logging.php';
 
 ob_start();
 ini_set('display_errors', 0);
@@ -43,6 +44,7 @@ function logResponse($action, $success, $message = '') {
 
 function logError($action, $error) {
     logMsg("ERROR: action=$action error=$error");
+    logApiError($action, $error);
 }
 
 function respond($data, $code = 200) {
@@ -890,7 +892,7 @@ function handle_getPostCommentCounts($pdo, $user) {
 }
 
 // ============== DISPATCHER ==============
-$PUBLIC_ENDPOINTS = ['login', 'logout', 'sendOTP', 'verifyOTP', 'resetPassword', 'sendRegisterOTP', 'verifyRegisterOTP', 'finishRegister'];
+$PUBLIC_ENDPOINTS = ['login', 'logout', 'sendOTP', 'verifyOTP', 'resetPassword', 'sendRegisterOTP', 'verifyRegisterOTP', 'finishRegister', 'log'];
 
 $HANDLERS = [
     'login' => 'handle_login', 'logout' => 'handle_logout', 'sendOTP' => 'handle_sendOTP',
@@ -908,7 +910,8 @@ $HANDLERS = [
     'isFollowing' => 'handle_isFollowing', 'deletePost' => 'handle_deletePost',
     'createComment' => 'handle_createComment', 'getPostComments' => 'handle_getPostComments',
     'deleteComment' => 'handle_deleteComment', 'getPostCommentCounts' => 'handle_getPostCommentCounts',
-    'markNotificationsSeen' => 'handle_markNotificationsSeen', 'getPostById' => 'handle_getPostById'
+    'markNotificationsSeen' => 'handle_markNotificationsSeen', 'getPostById' => 'handle_getPostById',
+    'log' => 'handle_log_request'
 ];
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') bad('Method not allowed', 405);
@@ -926,6 +929,9 @@ try {
     $handler = $HANDLERS[$action];
     $handler($pdo, $user);
 } catch (Exception $e) {
+    logError($action, $e->getMessage());
+    respond(['valid' => false, 'error' => 'Server error. Please try again.'], 500);
+} catch (Error $e) {
     logError($action, $e->getMessage());
     respond(['valid' => false, 'error' => 'Server error. Please try again.'], 500);
 }
