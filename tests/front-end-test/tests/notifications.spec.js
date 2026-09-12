@@ -108,7 +108,7 @@ test.describe('Notifications Page - Mark as Seen & Post Previews', () => {
       
       const href = await notificationLink.getAttribute('href');
       expect(href).toBeTruthy();
-      expect(href).toMatch(/^#\/profile\//).or(expect(href).toMatch(/^#\/post\//));
+      expect(href).toMatch(/^#\/(profile|post)\//);
     }
   });
 });

@@ -34,6 +34,13 @@ const API = {
 
       if (!response.ok || !json.valid) {
         const errorMsg = json.message || json.error || `HTTP ${response.status}`;
+
+        if (response.status === 401 && Store.isLoggedIn() && typeof SessionExpiredModal !== 'undefined') {
+          const retryFn = () => this.call(action, data);
+          await SessionExpiredModal.show(retryFn);
+          return {};
+        }
+
         throw new Error(errorMsg);
       }
 
