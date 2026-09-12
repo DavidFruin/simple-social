@@ -445,6 +445,37 @@ function handle_getPostById($pdo, $user) {
     bad('Post not found', 404);
 }
 
+function handle_getPostPreviews($pdo, $user) {
+    $postIdsRaw = $_POST['postIds'] ?? '[]';
+    $postIds = json_decode($postIdsRaw, true) ?? [];
+    if (!is_array($postIds) || empty($postIds)) {
+        respond(good(['previews' => []]));
+        return;
+    }
+
+    $previews = [];
+    $ownerIds = [];
+    foreach ($postIds as $pid) {
+        $ownerId = (int)explode('.', $pid)[0];
+        $ownerIds[$ownerId] = true;
+    }
+
+    $stmt = $pdo->prepare('SELECT id, posts FROM users WHERE id IN (' . implode(',', array_keys($ownerIds)) . ')');
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+
+    foreach ($rows as $row) {
+        $posts = json_decode($row['posts'], true) ?? [];
+        foreach ($posts as $post) {
+            if (in_array($post['id'], $postIds) && !empty($post['text'])) {
+                $previews[$post['id']] = substr($post['text'], 0, 25) . '...';
+            }
+        }
+    }
+
+    respond(good(['previews' => $previews]));
+}
+
 function handle_post($pdo, $user) {
     $text = trim($_POST['postText'] ?? '');
     if (!$text) bad('Post text required', 400);
@@ -796,6 +827,9 @@ function handle_deletePost($pdo, $user) {
     $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
     $stmt->execute([json_encode($newPosts), $user['sub']]);
 
+    $stmt = $pdo->prepare('DELETE FROM notifications WHERE post_id = ?');
+    $stmt->execute([$postId]);
+
     if ($postToDelete && !empty($postToDelete['mediaUrl'])) {
         $mediaUrl = $postToDelete['mediaUrl'];
         $mediaFile = __DIR__ . $mediaUrl;
@@ -911,6 +945,7 @@ $HANDLERS = [
     'createComment' => 'handle_createComment', 'getPostComments' => 'handle_getPostComments',
     'deleteComment' => 'handle_deleteComment', 'getPostCommentCounts' => 'handle_getPostCommentCounts',
     'markNotificationsSeen' => 'handle_markNotificationsSeen', 'getPostById' => 'handle_getPostById',
+    'getPostPreviews' => 'handle_getPostPreviews',
     'log' => 'handle_log_request'
 ];
 

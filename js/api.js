@@ -255,6 +255,10 @@ const API = {
 
   async getPostById(postId) {
     return this.call('getPostById', { postId });
+  },
+
+  async getPostPreviews(postIds) {
+    return this.call('getPostPreviews', { postIds: JSON.stringify(postIds) });
   }
 };
 

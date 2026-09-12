@@ -66,18 +66,12 @@ const NotificationsPage = {
 
     if (postIds.length === 0) return;
 
-    const promises = postIds.map(async (postId) => {
-      try {
-        const result = await api.getPostById(postId);
-        if (result.post && result.post.text) {
-          this.postPreviews[postId] = result.post.text.substring(0, 25) + '...';
-        }
-      } catch (err) {
-        this.postPreviews[postId] = null;
-      }
-    });
-
-    await Promise.all(promises);
+    try {
+      const result = await api.getPostPreviews(postIds);
+      this.postPreviews = result.previews || {};
+    } catch (err) {
+      // Silently ignore — notifications will render without post previews
+    }
   },
 
   async handleMarkSeen() {
