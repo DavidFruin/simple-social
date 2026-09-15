@@ -7,7 +7,10 @@ header('Content-Type: application/json');
 $email = getenv('TEST_EMAIL') ?: 'test@example.com';
 
 try {
-    $pdo = new PDO('sqlite:userdata.db');
+    require_once __DIR__ . '/../../config.php';
+    global $CONFIG;
+    $dbPath = $CONFIG['db_path'] ?? __DIR__ . '/../../userdata.db';
+    $pdo = new PDO('sqlite:' . $dbPath);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
     $stmt = $pdo->prepare('SELECT id, email, password FROM users WHERE LOWER(email) = LOWER(?)');

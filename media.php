@@ -9,7 +9,10 @@ error_reporting(E_ALL);
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
 function logMsg($msg) {
-    $logFile = __DIR__ . '/media.log';
+    global $CONFIG;
+    $logDir = $CONFIG['log_dir'] ?? (__DIR__ . '/logs');
+    if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
+    $logFile = rtrim($logDir, '/') . '/media.log';
     $timestamp = date('Y-m-d H:i:s');
     $entry = "[$timestamp] $msg\n";
     @file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
@@ -34,7 +37,9 @@ function good($data = []) {
 }
 
 function db() {
-    $pdo = new PDO('sqlite:userdata.db');
+    global $CONFIG;
+    $dbPath = $CONFIG['db_path'] ?? __DIR__ . '/userdata.db';
+    $pdo = new PDO('sqlite:' . $dbPath);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     return $pdo;
 }

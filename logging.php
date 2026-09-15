@@ -1,7 +1,11 @@
 <?php
 // logging.php - Log writing, rotation, and formatting
 
-define('LOG_DIR', __DIR__ . '/logs');
+if (!defined('LOG_DIR')) {
+    global $CONFIG;
+    $cfgLogDir = $CONFIG['log_dir'] ?? null;
+    define('LOG_DIR', $cfgLogDir ?: (__DIR__ . '/logs'));
+}
 define('LOG_MAX_SIZE', 5 * 1024 * 1024); // 5MB
 define('LOG_ROTATE_COUNT', 3);
 
@@ -88,11 +92,7 @@ function logPhpError($message, $context = []) {
 }
 
 function handle_log_request($pdo, $user) {
-    global $CONFIG;
-
-    $isTestMode = !empty($CONFIG['test_mode']);
-
-    if (!$isTestMode && !$user) {
+    if (!$user) {
         respond(['valid' => false, 'error' => 'Unauthorized'], 401);
     }
 

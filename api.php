@@ -21,7 +21,9 @@ $_POST = array_merge($_POST, getRawPostData());
 function logMsg($msg) {
     global $CONFIG;
     if (empty($CONFIG['debug'])) return;
-    $logFile = __DIR__ . '/api.log';
+    $logDir = $CONFIG['log_dir'] ?? (__DIR__ . '/logs');
+    if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
+    $logFile = rtrim($logDir, '/') . '/api.log';
     $timestamp = date('Y-m-d H:i:s');
     $entry = "[$timestamp] $msg\n";
     @file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
@@ -31,6 +33,8 @@ function logRequest($action, $params = [], $isPublic = false) {
     $safeParams = $params;
     if (isset($safeParams['password'])) $safeParams['password'] = '***';
     if (isset($safeParams['confirm'])) $safeParams['confirm'] = '***';
+    if (isset($safeParams['otp'])) $safeParams['otp'] = '***';
+    if (isset($safeParams['reset_otp'])) $safeParams['reset_otp'] = '***';
     if (isset($safeParams['postText'])) $safeParams['postText'] = substr($safeParams['postText'], 0, 50) . (strlen($safeParams['postText']) > 50 ? '...' : '');
     if (isset($safeParams['text'])) $safeParams['text'] = substr($safeParams['text'], 0, 50) . (strlen($safeParams['text']) > 50 ? '...' : '');
     $paramsStr = json_encode($safeParams);
@@ -60,7 +64,9 @@ function respond($data, $code = 200) {
 }
 
 function db() {
-    $pdo = new PDO('sqlite:userdata.db');
+    global $CONFIG;
+    $dbPath = $CONFIG['db_path'] ?? __DIR__ . '/userdata.db';
+    $pdo = new PDO('sqlite:' . $dbPath);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->exec('CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT, recipient_id INTEGER NOT NULL,
@@ -74,9 +80,11 @@ function db() {
 }
 
 function jwtEncode($payload) {
+    global $CONFIG;
+    $secret = $CONFIG['jwt_secret'] ?? null;
+    if (!$secret) { error_log('JWT secret not configured'); respond(['valid' => false, 'error' => 'Server misconfigured'], 500); }
     $header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])));
     $payloadStr = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
-    $secret = 'your-strong-secret-key-change-this-2026';
     $sig = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(hash_hmac('sha256', "$header.$payloadStr", $secret, true)));
     return "$header.$payloadStr.$sig";
 }

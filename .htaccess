@@ -3,3 +3,20 @@ SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 RewriteEngine On
 RewriteCond %{HTTP:Authorization} ^(.*)
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+
+# Block direct access to sensitive files
+<FilesMatch "\.(db|log|env|sqlite)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^(\.env|\.htaccess|\.gitignore)$">
+    Require all denied
+</FilesMatch>
+<Files "clean-notifications.php">
+    Require all denied
+</Files>
+<Files "config.php">
+    Require all denied
+</Files>
+
+RewriteRule ^(userdata\.db|.*\.log|\.env.*|clean-notifications\.php)$ - [F,L]
+

@@ -1,13 +1,19 @@
 <?php
+require_once __DIR__ . '/config.php';
 // clean-notifications.php - Clean old self-notifications from database
 // Upload to server and access via browser to run
 
+if (php_sapi_name() !== 'cli' && php_sapi_name() !== 'cli-server') {
+    http_response_code(403);
+    die('Forbidden: CLI only');
+}
 header('Content-Type: text/plain');
 
 echo "Cleaning self-notifications...\n\n";
 
 try {
-    $pdo = new PDO('sqlite:userdata.db');
+    $dbPath = $CONFIG['db_path'] ?? __DIR__ . '/userdata.db';
+    $pdo = new PDO('sqlite:' . $dbPath);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // Find self-notifications (actor_email = recipient's actual email)
