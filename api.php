@@ -150,6 +150,10 @@ function good($data = []) {
     return array_merge(['valid' => true], $data);
 }
 
+function validateContent($text, $errorMsg = 'You are trying to post illegal characters') {
+    if (preg_match('/[^\x20-\x7E\n\r\xC0-\xFF]/u', $text)) bad($errorMsg, 400);
+}
+
 // ============== AUTH HANDLERS ==============
 function handle_login($pdo) {
     $email = trim($_POST['email'] ?? '');
@@ -351,6 +355,8 @@ function handle_deleteAccount($pdo, $user) {
         }
     }
 
+    $stmt = $pdo->prepare('DELETE FROM comments WHERE user_id = ?');
+    $stmt->execute([$uid]);
     $stmt = $pdo->prepare('DELETE FROM users WHERE id = ?');
     $stmt->execute([$uid]);
     respond(good(['message' => 'Account deleted successfully']));
@@ -391,10 +397,10 @@ function handle_getMyFollows($pdo, $user) {
         $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id IN ($placeholders)");
         $stmt->execute($ids);
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($users as $user) {
+        foreach ($users as $u) {
             foreach ($followsData as $f) {
-                if ((is_array($f) ? $f['id'] : $f) == $user['id']) {
-                    $result[] = ['id' => $user['id'], 'email' => $user['email'], 'timestamp' => is_array($f) ? $f['timestamp'] : 'Unknown'];
+                if ((is_array($f) ? $f['id'] : $f) == $u['id']) {
+                    $result[] = ['id' => $u['id'], 'email' => $u['email'], 'timestamp' => is_array($f) ? $f['timestamp'] : 'Unknown'];
                     break;
                 }
             }
@@ -406,7 +412,7 @@ function handle_getMyFollows($pdo, $user) {
 function handle_getNotifications($pdo, $user) {
     $offset = isset($_POST['offset']) ? (int)$_POST['offset'] : 0;
     $limit = 25;
-    $stmt = $pdo->prepare('SELECT * FROM notifications WHERE recipient_id = ? AND actor_id != ? ORDER BY created_at DESC LIMIT ? OFFSET ?');
+    $stmt = $pdo->prepare('SELECT n.id, n.recipient_id, n.actor_id, COALESCE(u.email, n.actor_email) AS actor_email, n.type, n.post_id, n.created_at FROM notifications n LEFT JOIN users u ON n.actor_id = u.id WHERE n.recipient_id = ? AND n.actor_id != ? ORDER BY n.created_at DESC LIMIT ? OFFSET ?');
     $stmt->execute([$user['sub'], $user['sub'], $limit, $offset]);
     respond(good(['notifications' => $stmt->fetchAll(PDO::FETCH_ASSOC)]));
 }
@@ -446,6 +452,11 @@ function handle_getPostById($pdo, $user) {
     
     foreach ($posts as $post) {
         if ($post['id'] === $postId) {
+            $ownerStmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
+            $ownerStmt->execute([$ownerId]);
+            $ownerEmail = $ownerStmt->fetchColumn() ?: '';
+            $post['userID'] = $ownerId;
+            $post['userEmail'] = $ownerEmail;
             respond(good(['post' => $post]));
             return;
         }
@@ -468,8 +479,14 @@ function handle_getPostPreviews($pdo, $user) {
         $ownerIds[$ownerId] = true;
     }
 
-    $stmt = $pdo->prepare('SELECT id, posts FROM users WHERE id IN (' . implode(',', array_keys($ownerIds)) . ')');
-    $stmt->execute();
+    $ids = array_keys($ownerIds);
+    if (empty($ids)) {
+        respond(good(['previews' => []]));
+        return;
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare('SELECT id, posts FROM users WHERE id IN (' . $placeholders . ')');
+    $stmt->execute($ids);
     $rows = $stmt->fetchAll();
 
     foreach ($rows as $row) {
@@ -488,11 +505,7 @@ function handle_post($pdo, $user) {
     $text = trim($_POST['postText'] ?? '');
     if (!$text) bad('Post text required', 400);
     if (strlen($text) > 5000) bad('You are trying to make a post that is longer than 5K characters', 400);
-
-    $allowed = ' !"#$\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ÁÉÍÓÚÜÑáéíóúüñ¿¡«»';
-    for ($i = 0; $i < strlen($text); $i++) {
-        if (strpos($allowed, $text[$i]) === false) bad('You are trying to post illegal characters', 400);
-    }
+    validateContent($text, 'You are trying to post illegal characters');
 
     $uid = $user['sub'];
     $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
@@ -706,12 +719,17 @@ function handle_unlikePost($pdo, $user) {
     $postsJson = $row['posts'];
     $posts = json_decode($postsJson, true) ?? [];
 
+    $postFound = false;
+    $wasLiked = false;
     foreach ($posts as &$post) {
         if ($post['id'] === $postId) {
+            $postFound = true;
             if (isset($post['likes'])) {
+                $before = count($post['likes']);
                 $post['likes'] = array_filter($post['likes'], fn($like) => $like['userId'] != $user['sub']);
                 $post['likes'] = array_values($post['likes']);
-                if ($ownerId != $user['sub']) {
+                $wasLiked = count($post['likes']) < $before;
+                if ($wasLiked && $ownerId != $user['sub']) {
                     $stmt = $pdo->prepare('INSERT INTO notifications (recipient_id, actor_id, actor_email, type, post_id, created_at) VALUES (?, ?, ?, ?, ?, ?)');
                     $stmt->execute([$ownerId, $user['sub'], $actorEmail, 'unlike', $postId, date('Y-m-d H:i:s')]);
                 }
@@ -719,6 +737,7 @@ function handle_unlikePost($pdo, $user) {
             break;
         }
     }
+    if (!$postFound) bad('Post not found', 404);
 
     $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
     $stmt->execute([json_encode($posts), $ownerId]);
@@ -864,11 +883,7 @@ function handle_createComment($pdo, $user) {
     if (!$postId) bad('Missing post ID', 400);
     if (!$text) bad('Comment text required', 400);
     if (strlen($text) > 5000) bad('Comment too long (max 5000 chars)', 400);
-
-    $allowed = ' !"#$\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ÁÉÍÓÚÜÑáéíóúüñ¿¡«»';
-    for ($i = 0; $i < strlen($text); $i++) {
-        if (strpos($allowed, $text[$i]) === false) bad('Illegal characters in comment', 400);
-    }
+    validateContent($text, 'Illegal characters in comment');
 
     $stmt = $pdo->prepare('INSERT INTO comments (post_id, user_id, comment_text, created_at) VALUES (?, ?, ?, ?)');
     $stmt->execute([$postId, $user['sub'], $text, date('Y-m-d H:i:s')]);
