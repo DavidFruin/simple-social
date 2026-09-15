@@ -151,7 +151,7 @@ function good($data = []) {
 }
 
 function validateContent($text, $errorMsg = 'You are trying to post illegal characters') {
-    if (preg_match('/[^\x20-\x7E\n\r\xC0-\xFF]/u', $text)) bad($errorMsg, 400);
+    if (preg_match('/[^\x20-\x7E\n\r\xA0-\xFF]/u', $text)) bad($errorMsg, 400);
 }
 
 // ============== AUTH HANDLERS ==============
