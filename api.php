@@ -501,7 +501,9 @@ function handle_post($pdo, $user) {
     $posts = $postsJson ? json_decode($postsJson, true) : [];
     if (!is_array($posts)) $posts = [];
 
-    $newPost = ['id' => $uid . '.' . time(), 'text' => $text, 'timestamp' => date('Y-m-d H:i:s'), 'likes' => [], 'mediaUrl' => $_POST['mediaUrl'] ?? null];
+    $rawMedia = $_POST['mediaUrl'] ?? null;
+    if ($rawMedia === 'null' || $rawMedia === '') $rawMedia = null;
+    $newPost = ['id' => $uid . '.' . time(), 'text' => $text, 'timestamp' => date('Y-m-d H:i:s'), 'likes' => [], 'mediaUrl' => $rawMedia];
     array_unshift($posts, $newPost);
     $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
     $stmt->execute([json_encode($posts), $uid]);
@@ -838,7 +840,7 @@ function handle_deletePost($pdo, $user) {
     $stmt = $pdo->prepare('DELETE FROM notifications WHERE post_id = ?');
     $stmt->execute([$postId]);
 
-    if ($postToDelete && !empty($postToDelete['mediaUrl'])) {
+    if ($postToDelete && !empty($postToDelete['mediaUrl']) && $postToDelete['mediaUrl'] !== 'null') {
         $mediaUrl = $postToDelete['mediaUrl'];
         $mediaFile = __DIR__ . $mediaUrl;
         if (file_exists($mediaFile)) {
