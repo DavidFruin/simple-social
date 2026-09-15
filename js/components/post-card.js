@@ -56,16 +56,16 @@ function createMediaHtml(mediaUrl) {
 
   if (isImage) {
     return `
-      <div class="post-media" data-full-url="${mediaUrl}" data-type="image">
-        <img src="${thumbnailUrl}" alt="Post media" class="media-thumbnail" onclick="MediaViewer.open('${mediaUrl}', 'image')">
+      <div class="post-media" data-full-url="${escapeHtml(mediaUrl)}" data-type="image">
+        <img src="${escapeHtml(thumbnailUrl)}" alt="Post media" class="media-thumbnail">
       </div>
     `;
   }
 
   if (isVideo) {
     return `
-      <div class="post-media" data-full-url="${mediaUrl}" data-type="video">
-        <video src="${thumbnailUrl}" class="media-thumbnail" poster="${thumbnailUrl}" onclick="MediaViewer.open('${mediaUrl}', 'video')" muted></video>
+      <div class="post-media" data-full-url="${escapeHtml(mediaUrl)}" data-type="video">
+        <video src="${escapeHtml(thumbnailUrl)}" class="media-thumbnail" poster="${escapeHtml(thumbnailUrl)}" muted></video>
         <div class="video-play-icon">▶</div>
       </div>
     `;
@@ -73,8 +73,8 @@ function createMediaHtml(mediaUrl) {
 
   if (isAudio) {
     return `
-      <div class="post-media" data-full-url="${mediaUrl}" data-type="audio">
-        <audio controls src="${mediaUrl}"></audio>
+      <div class="post-media" data-full-url="${escapeHtml(mediaUrl)}" data-type="audio">
+        <audio controls src="${escapeHtml(mediaUrl)}"></audio>
       </div>
     `;
   }
@@ -106,6 +106,24 @@ function formatTimestamp(timestamp) {
   if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
   
   return date.toLocaleDateString();
+}
+
+// Delegated media-viewer handling. Replaces inline onclick= attributes so the
+// media URL is never interpolated into an executable JS string context.
+// Installed once at load; works for any dynamically re-rendered post card.
+if (!window.__mediaViewerDelegated) {
+  window.__mediaViewerDelegated = true;
+  document.addEventListener('click', (e) => {
+    const thumb = e.target.closest('.media-thumbnail');
+    if (!thumb) return;
+    const wrapper = thumb.closest('.post-media');
+    if (!wrapper) return;
+    const url = wrapper.getAttribute('data-full-url');
+    const type = wrapper.getAttribute('data-type');
+    if (url && type && typeof MediaViewer !== 'undefined') {
+      MediaViewer.open(url, type);
+    }
+  });
 }
 
 window.createPostCard = createPostCard;

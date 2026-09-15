@@ -7,14 +7,6 @@ const API = {
   jwt: null,
 
   async call(action, data = {}) {
-    const formData = new FormData();
-    formData.append('action', action);
-    for (const [key, value] of Object.entries(data)) {
-      if (value !== undefined && value !== null) {
-        formData.append(key, value);
-      }
-    }
-
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     if (this.jwt) {
       headers['Authorization'] = `Bearer ${this.jwt}`;
