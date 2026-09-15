@@ -4,6 +4,10 @@ const PostPage = {
   comments: [],
   userId: null,
   timestamp: null,
+  postClickHandler: null,
+  postContainerEl: null,
+  commentsClickHandler: null,
+  commentsContainerEl: null,
 
   render(container, postId) {
     this.isActive = true;
@@ -46,6 +50,16 @@ const PostPage = {
 
   destroy() {
     this.isActive = false;
+    if (this.postClickHandler && this.postContainerEl) {
+      this.postContainerEl.removeEventListener('click', this.postClickHandler);
+      this.postClickHandler = null;
+      this.postContainerEl = null;
+    }
+    if (this.commentsClickHandler && this.commentsContainerEl) {
+      this.commentsContainerEl.removeEventListener('click', this.commentsClickHandler);
+      this.commentsClickHandler = null;
+      this.commentsContainerEl = null;
+    }
   },
 
   attachEventListeners() {
@@ -95,18 +109,32 @@ const PostPage = {
     this.attachPostEventListeners();
   },
 
+  // Single delegated listener (see feed.js) - prevents handler accumulation
+  // when the post card re-renders after like/unlike.
   attachPostEventListeners() {
-    document.querySelectorAll('.btn-like').forEach(btn => {
-      btn.addEventListener('click', e => this.handleLikeClick(e));
-    });
+    const container = document.getElementById('post-container');
+    if (!container || this.postClickHandler) return;
 
-    document.querySelectorAll('.btn-like-count').forEach(btn => {
-      btn.addEventListener('click', e => this.handleLikeCountClick(e));
-    });
+    this.postContainerEl = container;
+    this.postClickHandler = (e) => {
+      const likeBtn = e.target.closest('.btn-like');
+      if (likeBtn && container.contains(likeBtn)) {
+        this.handleLikeClick({ currentTarget: likeBtn });
+        return;
+      }
 
-    document.querySelectorAll('.btn-delete-post').forEach(btn => {
-      btn.addEventListener('click', e => this.handleDeletePost());
-    });
+      const likeCountBtn = e.target.closest('.btn-like-count');
+      if (likeCountBtn && container.contains(likeCountBtn)) {
+        this.handleLikeCountClick({ currentTarget: likeCountBtn });
+        return;
+      }
+
+      const deleteBtn = e.target.closest('.btn-delete-post');
+      if (deleteBtn && container.contains(deleteBtn)) {
+        this.handleDeletePost();
+      }
+    };
+    container.addEventListener('click', this.postClickHandler);
   },
 
   async loadComments() {
@@ -154,9 +182,17 @@ const PostPage = {
   },
 
   attachCommentEventListeners() {
-    document.querySelectorAll('.btn-delete-comment').forEach(btn => {
-      btn.addEventListener('click', e => this.handleDeleteComment(e));
-    });
+    const container = document.getElementById('comments-container');
+    if (!container || this.commentsClickHandler) return;
+
+    this.commentsContainerEl = container;
+    this.commentsClickHandler = (e) => {
+      const deleteBtn = e.target.closest('.btn-delete-comment');
+      if (deleteBtn && container.contains(deleteBtn)) {
+        this.handleDeleteComment({ currentTarget: deleteBtn });
+      }
+    };
+    container.addEventListener('click', this.commentsClickHandler);
   },
 
   async handleLikeClick(e) {

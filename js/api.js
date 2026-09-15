@@ -190,6 +190,36 @@ const API = {
       throw error;
     }
   },
+
+  async deleteMedia(mediaId) {
+    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    if (this.jwt) {
+      headers['Authorization'] = 'Bearer ' + this.jwt;
+    }
+
+    const body = new URLSearchParams();
+    body.set('action', 'deleteMedia');
+    body.set('mediaId', mediaId);
+
+    try {
+      const response = await fetch('/media.php', {
+        method: 'POST',
+        headers,
+        body: body.toString()
+      });
+
+      const json = await response.json();
+      if (!response.ok || !json.valid) {
+        const errorMsg = json.message || json.error || 'HTTP ' + response.status;
+        throw new Error(errorMsg);
+      }
+      return json;
+    } catch (error) {
+      console.error('Delete Media Error:', error);
+      if (typeof Logger !== 'undefined') Logger.error('DeleteMedia: ' + error.message);
+      throw error;
+    }
+  },
   async likePost(postId) {
     return this.call('likePost', { postId });
   },

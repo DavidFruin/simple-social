@@ -3,6 +3,7 @@ const CreatePostPage = {
   DRAFT_KEY: 'ss_post_draft',
   currentMediaUrl: null,
   currentMediaType: null,
+  currentMediaId: null,
   uploading: false,
   captureStream: null,
   mediaRecorder: null,
@@ -118,8 +119,17 @@ const CreatePostPage = {
     try {
       const result = await api.uploadMedia(file);
       
+      // Replacing existing media: delete the previous upload so it isn't orphaned
+      const previousMediaId = this.currentMediaId;
+      if (previousMediaId && previousMediaId !== result.mediaId) {
+        api.deleteMedia(previousMediaId).catch(err => {
+          console.error('Failed to delete replaced media:', err.message);
+        });
+      }
+
       this.currentMediaUrl = result.mediaUrl;
       this.currentMediaType = result.type;
+      this.currentMediaId = result.mediaId;
       
       this.renderMediaPreview(result);
       status.textContent = 'Uploaded!';
@@ -259,8 +269,17 @@ const CreatePostPage = {
 
       const result = await api.uploadMedia(file);
 
+      // Replacing existing media: delete the previous upload so it isn't orphaned
+      const previousMediaId = this.currentMediaId;
+      if (previousMediaId && previousMediaId !== result.mediaId) {
+        api.deleteMedia(previousMediaId).catch(err => {
+          console.error('Failed to delete replaced media:', err.message);
+        });
+      }
+
       this.currentMediaUrl = result.mediaUrl;
       this.currentMediaType = result.type;
+      this.currentMediaId = result.mediaId;
       this.renderMediaPreview(result);
 
       this.closeCaptureModal();
@@ -541,8 +560,17 @@ const CreatePostPage = {
 
       const result = await api.uploadMedia(file);
 
+      // Replacing existing media: delete the previous upload so it isn't orphaned
+      const previousMediaId = this.currentMediaId;
+      if (previousMediaId && previousMediaId !== result.mediaId) {
+        api.deleteMedia(previousMediaId).catch(err => {
+          console.error('Failed to delete replaced media:', err.message);
+        });
+      }
+
       this.currentMediaUrl = result.mediaUrl;
       this.currentMediaType = result.type;
+      this.currentMediaId = result.mediaId;
       this.renderMediaPreview(result);
 
       this.closeCaptureModal();
@@ -565,8 +593,18 @@ const CreatePostPage = {
   },
 
   clearMedia() {
+    // Delete the uploaded file server-side so abandoned uploads don't orphan.
+    // Only fires when media was uploaded but never attached to a post.
+    const orphanId = this.currentMediaId;
+    if (orphanId) {
+      api.deleteMedia(orphanId).catch(err => {
+        console.error('Failed to delete unused media:', err.message);
+      });
+    }
+
     this.currentMediaUrl = null;
     this.currentMediaType = null;
+    this.currentMediaId = null;
     this.stopCaptureStream();
     this.stopVisualizer();
     
@@ -575,6 +613,25 @@ const CreatePostPage = {
     const status = document.getElementById('media-status');
     const selectMediaBtn = document.getElementById('select-media-btn');
     
+    if (preview) preview.innerHTML = '';
+    if (mediaInput) mediaInput.value = '';
+    if (status) status.textContent = '';
+    if (selectMediaBtn) selectMediaBtn.textContent = 'Add Media';
+  },
+
+  // Reset media state WITHOUT deleting server-side (media is now owned by a post)
+  resetMediaState() {
+    this.currentMediaUrl = null;
+    this.currentMediaType = null;
+    this.currentMediaId = null;
+    this.stopCaptureStream();
+    this.stopVisualizer();
+
+    const preview = document.getElementById('media-preview');
+    const mediaInput = document.getElementById('media-input');
+    const status = document.getElementById('media-status');
+    const selectMediaBtn = document.getElementById('select-media-btn');
+
     if (preview) preview.innerHTML = '';
     if (mediaInput) mediaInput.value = '';
     if (status) status.textContent = '';
@@ -601,7 +658,8 @@ const CreatePostPage = {
 
       textarea.value = '';
       this.clearDraft();
-      this.clearMedia();
+      // Media is now owned by the post - reset state without deleting it
+      this.resetMediaState();
       showSuccess('Post created!');
     } catch (err) {
       showError(err.message);

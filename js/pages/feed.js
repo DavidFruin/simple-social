@@ -145,18 +145,33 @@ const FeedPage = {
     });
   },
 
+  // Single delegated listener on the container, attached once. Re-rendering the
+  // post list replaces innerHTML, so per-button listeners would accumulate on
+  // every render (memory leak + duplicate handler firing).
   attachPostEventListeners() {
-    document.querySelectorAll('.btn-like').forEach(btn => {
-      btn.addEventListener('click', e => this.handleLikeClick(e));
-    });
+    const container = document.getElementById('posts-container');
+    if (!container || this.postsClickHandler) return;
 
-    document.querySelectorAll('.btn-like-count').forEach(btn => {
-      btn.addEventListener('click', e => this.handleLikeCountClick(e));
-    });
+    this.postsContainerEl = container;
+    this.postsClickHandler = (e) => {
+      const likeBtn = e.target.closest('.btn-like');
+      if (likeBtn && container.contains(likeBtn)) {
+        this.handleLikeClick({ currentTarget: likeBtn });
+        return;
+      }
 
-    document.querySelectorAll('.btn-delete-post').forEach(btn => {
-      btn.addEventListener('click', e => this.handleDeleteClick(e));
-    });
+      const likeCountBtn = e.target.closest('.btn-like-count');
+      if (likeCountBtn && container.contains(likeCountBtn)) {
+        this.handleLikeCountClick({ currentTarget: likeCountBtn });
+        return;
+      }
+
+      const deleteBtn = e.target.closest('.btn-delete-post');
+      if (deleteBtn && container.contains(deleteBtn)) {
+        this.handleDeleteClick({ currentTarget: deleteBtn });
+      }
+    };
+    container.addEventListener('click', this.postsClickHandler);
   },
 
   async handleLikeClick(e) {

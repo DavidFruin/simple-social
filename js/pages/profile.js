@@ -3,6 +3,8 @@ const ProfilePage = {
   user: null,
   posts: [],
   commentCounts: {},
+  postsClickHandler: null,
+  postsContainerEl: null,
   isOwnProfile: false,
   followersCount: 0,
   followingCount: 0,
@@ -35,6 +37,11 @@ const ProfilePage = {
 
   destroy() {
     this.isActive = false;
+    if (this.postsClickHandler && this.postsContainerEl) {
+      this.postsContainerEl.removeEventListener('click', this.postsClickHandler);
+      this.postsClickHandler = null;
+      this.postsContainerEl = null;
+    }
   },
 
   async loadProfile() {
@@ -67,7 +74,7 @@ const ProfilePage = {
         try {
           const result = await api.getPostCommentCounts(postIds);
           if (!this.isActive) return;
-          this.commentCounts = result.counts;
+          this.commentCounts = { ...this.commentCounts, ...result.counts };
         } catch (err) {
           console.error('Failed to load comment counts:', err);
         }
@@ -162,18 +169,32 @@ container.innerHTML = this.posts.map(post => {
     this.attachPostEventListeners();
   },
 
+  // Single delegated listener (see feed.js) - prevents handler accumulation
+  // across re-renders of the post list.
   attachPostEventListeners() {
-    document.querySelectorAll('.btn-like').forEach(btn => {
-      btn.addEventListener('click', e => this.handleLikeClick(e));
-    });
+    const container = document.getElementById('posts-container');
+    if (!container || this.postsClickHandler) return;
 
-    document.querySelectorAll('.btn-like-count').forEach(btn => {
-      btn.addEventListener('click', e => this.handleLikeCountClick(e));
-    });
+    this.postsContainerEl = container;
+    this.postsClickHandler = (e) => {
+      const likeBtn = e.target.closest('.btn-like');
+      if (likeBtn && container.contains(likeBtn)) {
+        this.handleLikeClick({ currentTarget: likeBtn });
+        return;
+      }
 
-    document.querySelectorAll('.btn-delete-post').forEach(btn => {
-      btn.addEventListener('click', e => this.handleDeleteClick(e));
-    });
+      const likeCountBtn = e.target.closest('.btn-like-count');
+      if (likeCountBtn && container.contains(likeCountBtn)) {
+        this.handleLikeCountClick({ currentTarget: likeCountBtn });
+        return;
+      }
+
+      const deleteBtn = e.target.closest('.btn-delete-post');
+      if (deleteBtn && container.contains(deleteBtn)) {
+        this.handleDeleteClick({ currentTarget: deleteBtn });
+      }
+    };
+    container.addEventListener('click', this.postsClickHandler);
   },
 
   async handleFollowClick() {
