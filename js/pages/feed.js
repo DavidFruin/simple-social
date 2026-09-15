@@ -7,6 +7,9 @@ const FeedPage = {
   hasMore: true,
   loading: false,
   scrollHandler: null,
+  scrollDebounce: null,
+  postsClickHandler: null,
+  postsContainerEl: null,
 
   render(container) {
     this.isActive = true;
@@ -30,14 +33,17 @@ const FeedPage = {
 
   attachEventListeners() {
     this.scrollHandler = () => {
-      if (this.hasMore && !this.loading) {
+      if (this.scrollDebounce) return;
+      this.scrollDebounce = setTimeout(() => {
+        this.scrollDebounce = null;
+        if (!this.hasMore || this.loading) return;
         const scrollHeight = document.documentElement.scrollHeight;
         const scrollTop = document.documentElement.scrollTop;
         const clientHeight = document.documentElement.clientHeight;
         if (scrollTop + clientHeight >= scrollHeight - 100) {
           this.loadMorePosts();
         }
-      }
+      }, 150);
     };
     window.addEventListener('scroll', this.scrollHandler);
   },
@@ -47,6 +53,15 @@ const FeedPage = {
     if (this.scrollHandler) {
       window.removeEventListener('scroll', this.scrollHandler);
       this.scrollHandler = null;
+    }
+    if (this.scrollDebounce) {
+      clearTimeout(this.scrollDebounce);
+      this.scrollDebounce = null;
+    }
+    if (this.postsClickHandler && this.postsContainerEl) {
+      this.postsContainerEl.removeEventListener('click', this.postsClickHandler);
+      this.postsClickHandler = null;
+      this.postsContainerEl = null;
     }
   },
 
@@ -61,6 +76,7 @@ const FeedPage = {
 
   async loadMorePosts() {
     if (!this.hasMore || this.loading) return;
+    this.loading = true;
     await this.fetchPosts(this.offset);
   },
 

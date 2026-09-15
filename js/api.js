@@ -37,7 +37,8 @@ const API = {
 
         if (response.status === 401 && Store.isLoggedIn() && typeof SessionExpiredModal !== 'undefined') {
           const retryFn = () => this.call(action, data);
-          await SessionExpiredModal.show(retryFn);
+          const retryResult = await SessionExpiredModal.show(retryFn);
+          if (retryResult !== undefined && retryResult !== null) return retryResult;
           return {};
         }
 

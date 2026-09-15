@@ -60,10 +60,9 @@ const PostPage = {
     const container = document.getElementById('post-container');
 
     try {
-      const result = await api.getUserPosts(this.userId);
+      const result = await api.getPostById(this.postId);
       if (!this.isActive) return;
-      const posts = result.posts || [];
-      this.post = posts.find(p => p.id === this.postId);
+      this.post = result.post || null;
 
       if (!this.post) {
         container.innerHTML = '<div class="error-message">Post not found</div>';

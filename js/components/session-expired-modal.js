@@ -76,15 +76,16 @@ const SessionExpiredModal = {
         const retryFn = this._retryFn;
         this.close();
 
-        if (resolve) resolve(result.jwt);
-
+        let retryResult;
         if (retryFn) {
           try {
-            await retryFn();
+            retryResult = await retryFn();
           } catch (err) {
-            // Retry failed — not critical, user is re-authenticated
+            retryResult = undefined;
           }
         }
+
+        if (resolve) resolve(retryResult);
       } else {
         throw new Error('No JWT received');
       }
