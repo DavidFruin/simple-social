@@ -76,6 +76,15 @@ function db() {
     $pdo->exec('CREATE TABLE IF NOT EXISTS comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT, post_id TEXT NOT NULL,
         user_id INTEGER NOT NULL, comment_text TEXT NOT NULL, created_at TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS media (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+        filename TEXT NOT NULL, type TEXT NOT NULL, path TEXT NOT NULL, created_at TEXT NOT NULL, post_id TEXT)');
+    try {
+        $cols = $pdo->query("PRAGMA table_info(media)")->fetchAll(PDO::FETCH_ASSOC);
+        $hasPostId = false;
+        foreach ($cols as $c) if ($c['name'] === 'post_id') $hasPostId = true;
+        if (!$hasPostId) $pdo->exec('ALTER TABLE media ADD COLUMN post_id TEXT');
+    } catch (Exception $e) {}
     return $pdo;
 }
 
@@ -357,6 +366,17 @@ function handle_deleteAccount($pdo, $user) {
 
     $stmt = $pdo->prepare('DELETE FROM comments WHERE user_id = ?');
     $stmt->execute([$uid]);
+    $stmt = $pdo->prepare('SELECT path FROM media WHERE user_id = ?');
+    $stmt->execute([$uid]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $f = __DIR__ . $r['path'];
+        if (strpos($r['path'], '..') === false && file_exists($f)) @unlink($f);
+        $tf = str_replace('/video/', '/video/thumb_', $f);
+        if (file_exists($tf)) @unlink($tf);
+    }
+    $pdo->prepare('DELETE FROM media WHERE user_id = ?')->execute([$uid]);
+    $mediaDir = __DIR__ . '/media/' . $uid;
+    if (is_dir($mediaDir)) @rmdir($mediaDir . '/image') && @rmdir($mediaDir . '/video') && @rmdir($mediaDir . '/audio') && @rmdir($mediaDir);
     $stmt = $pdo->prepare('DELETE FROM users WHERE id = ?');
     $stmt->execute([$uid]);
     respond(good(['message' => 'Account deleted successfully']));
@@ -516,10 +536,20 @@ function handle_post($pdo, $user) {
 
     $rawMedia = $_POST['mediaUrl'] ?? null;
     if ($rawMedia === 'null' || $rawMedia === '') $rawMedia = null;
+    if ($rawMedia !== null) {
+        $stmt = $pdo->prepare('SELECT id FROM media WHERE path = ? AND user_id = ?');
+        $stmt->execute([$rawMedia, $uid]);
+        $mediaRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$mediaRow) bad('Invalid mediaUrl or not owned by user', 400);
+    }
     $newPost = ['id' => $uid . '.' . time(), 'text' => $text, 'timestamp' => date('Y-m-d H:i:s'), 'likes' => [], 'mediaUrl' => $rawMedia];
     array_unshift($posts, $newPost);
     $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
     $stmt->execute([json_encode($posts), $uid]);
+    if ($rawMedia !== null) {
+        $stmt = $pdo->prepare('UPDATE media SET post_id = ? WHERE path = ? AND user_id = ?');
+        $stmt->execute([$newPost['id'], $rawMedia, $uid]);
+    }
     respond(good(['postId' => $newPost['id']]));
 }
 
@@ -861,14 +891,19 @@ function handle_deletePost($pdo, $user) {
 
     if ($postToDelete && !empty($postToDelete['mediaUrl']) && $postToDelete['mediaUrl'] !== 'null') {
         $mediaUrl = $postToDelete['mediaUrl'];
-        $mediaFile = __DIR__ . $mediaUrl;
-        if (file_exists($mediaFile)) {
-            unlink($mediaFile);
-        }
-        if (strpos($mediaUrl, '/video/') !== false) {
-            $thumbFile = str_replace('/video/', '/video/thumb_', $mediaFile);
-            if (file_exists($thumbFile)) {
-                unlink($thumbFile);
+        if (strpos($mediaUrl, '..') === false && strpos($mediaUrl, '/') === 0) {
+            $stmt = $pdo->prepare('SELECT id, path FROM media WHERE path = ? AND user_id = ?');
+            $stmt->execute([$mediaUrl, $user['sub']]);
+            $mediaRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($mediaRow) {
+                $mediaFile = __DIR__ . $mediaRow['path'];
+                if (file_exists($mediaFile)) unlink($mediaFile);
+                if (strpos($mediaRow['path'], '/video/') !== false) {
+                    $thumbFile = str_replace('/video/', '/video/thumb_', $mediaFile);
+                    if (file_exists($thumbFile)) unlink($thumbFile);
+                }
+                $stmt = $pdo->prepare('DELETE FROM media WHERE id = ?');
+                $stmt->execute([$mediaRow['id']]);
             }
         }
     }

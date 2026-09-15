@@ -41,6 +41,13 @@ function db() {
     $dbPath = $CONFIG['db_path'] ?? __DIR__ . '/userdata.db';
     $pdo = new PDO('sqlite:' . $dbPath);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->exec('CREATE TABLE IF NOT EXISTS media (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, filename TEXT NOT NULL, type TEXT NOT NULL, path TEXT NOT NULL, created_at TEXT NOT NULL, post_id TEXT)');
+    try {
+        $cols = $pdo->query("PRAGMA table_info(media)")->fetchAll(PDO::FETCH_ASSOC);
+        $has = false;
+        foreach ($cols as $c) if ($c['name'] === 'post_id') $has = true;
+        if (!$has) $pdo->exec('ALTER TABLE media ADD COLUMN post_id TEXT');
+    } catch (Exception $e) {}
     return $pdo;
 }
 
