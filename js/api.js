@@ -30,9 +30,13 @@ const API = {
         // Never intercept a failed login with the session-expired modal: the
         // modal's own re-login call would recurse into itself, leaving the
         // button stuck on "Logging in..." and the error message never shown.
-        const isLoginAttempt = action === 'login';
+        //
+        // deleteAccount also returns 401 for a wrong password, not an expired
+        // session (reaching that handler at all requires a valid JWT), so it
+        // must be excluded too or the real error never reaches the caller.
+        const bypassesSessionModal = action === 'login' || action === 'deleteAccount';
 
-        if (!isLoginAttempt && response.status === 401 && Store.isLoggedIn() && typeof SessionExpiredModal !== 'undefined') {
+        if (!bypassesSessionModal && response.status === 401 && Store.isLoggedIn() && typeof SessionExpiredModal !== 'undefined') {
           const retryFn = () => this.call(action, data);
           const retryResult = await SessionExpiredModal.show(retryFn);
           if (retryResult !== undefined && retryResult !== null) return retryResult;
