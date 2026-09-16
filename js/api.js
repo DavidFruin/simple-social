@@ -27,7 +27,12 @@ const API = {
       if (!response.ok || !json.valid) {
         const errorMsg = json.message || json.error || `HTTP ${response.status}`;
 
-        if (response.status === 401 && Store.isLoggedIn() && typeof SessionExpiredModal !== 'undefined') {
+        // Never intercept a failed login with the session-expired modal: the
+        // modal's own re-login call would recurse into itself, leaving the
+        // button stuck on "Logging in..." and the error message never shown.
+        const isLoginAttempt = action === 'login';
+
+        if (!isLoginAttempt && response.status === 401 && Store.isLoggedIn() && typeof SessionExpiredModal !== 'undefined') {
           const retryFn = () => this.call(action, data);
           const retryResult = await SessionExpiredModal.show(retryFn);
           if (retryResult !== undefined && retryResult !== null) return retryResult;
