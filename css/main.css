@@ -59,25 +59,42 @@ body {
 }
 
 :root[data-theme="red"] {
-  --color-primary: #b8655f;
-  --color-primary-hover: #a1554f;
-  --color-secondary: #a1554f;
-  --color-bg: #fdf6f5;
-  --color-bg-secondary: #faf0ee;
-  --color-text: #4a3130;
-  --color-text-secondary: #8a6461;
-  --color-border: #e8d5d3;
+  --color-primary: #c1483f;
+  --color-primary-hover: #a83a32;
+  --color-secondary: #a83a32;
+  --color-bg: #f8e8e4;
+  --color-bg-secondary: #f0d9d4;
+  --color-text: #3a1f1d;
+  --color-text-secondary: #7a4a44;
+  --color-border: #dba9a1;
 }
 
 :root[data-theme="blue"] {
-  --color-primary: #3ba9e0;
-  --color-primary-hover: #2f92c4;
-  --color-secondary: #2f92c4;
-  --color-bg: #f7fcff;
-  --color-bg-secondary: #eaf6fd;
-  --color-text: #234a63;
-  --color-text-secondary: #5c85a0;
-  --color-border: #cdeaf7;
+  --color-primary: #0ea5e9;
+  --color-primary-hover: #0c8bc9;
+  --color-secondary: #0c8bc9;
+  --color-bg: #e3f7ff;
+  --color-bg-secondary: #b9e4fb;
+  --color-text: #123a52;
+  --color-text-secondary: #3d6b86;
+  --color-border: #9ddcf5;
+}
+
+/* Classic terminal green-on-black, but with the rest of the ANSI 16-color
+   palette spread across the site's existing semantic slots (success/error/
+   warning/secondary) instead of everything being one color. */
+:root[data-theme="hacker"] {
+  --color-primary: #00d7d7;
+  --color-primary-hover: #00ffff;
+  --color-secondary: #d633d6;
+  --color-success: #00d700;
+  --color-error: #d70000;
+  --color-warning: #d7d700;
+  --color-bg: #1a1a1a;
+  --color-bg-secondary: #0c0c0c;
+  --color-text: #00ff00;
+  --color-text-secondary: #808080;
+  --color-border: #444444;
 }
 
 /* ============== LAYOUT ============== */

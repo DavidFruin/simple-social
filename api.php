@@ -743,7 +743,7 @@ function handle_getMyInfo($pdo, $user) {
 
 function handle_updateTheme($pdo, $user) {
     $theme = $_POST['theme'] ?? '';
-    $allowedThemes = ['light', 'dark', 'red', 'blue'];
+    $allowedThemes = ['light', 'dark', 'red', 'blue', 'hacker'];
     if (!in_array($theme, $allowedThemes, true)) bad('Invalid theme', 400);
 
     $stmt = $pdo->prepare('UPDATE users SET theme = ? WHERE id = ?');
