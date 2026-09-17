@@ -15,6 +15,7 @@ const ProfilePage = {
   loading: false,
   isFollowing: false,
   scrollPosition: 0,
+  outsideClickHandler: null,
 
   render(container, userId, { restore = false } = {}) {
     this.isActive = true;
@@ -79,6 +80,7 @@ const ProfilePage = {
   destroy() {
     this.isActive = false;
     this.scrollPosition = window.scrollY;
+    this.removeOutsideClickHandler();
     if (this.postsClickHandler && this.postsContainerEl) {
       this.postsContainerEl.removeEventListener('click', this.postsClickHandler);
       this.postsClickHandler = null;
@@ -409,12 +411,22 @@ container.innerHTML = this.posts.map(post => {
       this.toggleFollowingDropdown(followingDropdown, followersDropdown);
     });
 
-    document.addEventListener('click', (e) => {
+    // One document-level listener for the page, replaced on each render and
+    // removed in destroy() so they don't pile up across visits.
+    this.removeOutsideClickHandler();
+    this.outsideClickHandler = (e) => {
       if (!e.target.closest('.profile-stats')) {
         followersDropdown?.classList.add('hidden');
         followingDropdown?.classList.add('hidden');
       }
-    });
+    };
+    document.addEventListener('click', this.outsideClickHandler);
+  },
+
+  removeOutsideClickHandler() {
+    if (!this.outsideClickHandler) return;
+    document.removeEventListener('click', this.outsideClickHandler);
+    this.outsideClickHandler = null;
   },
 
   async toggleFollowersDropdown(showDropdown, hideDropdown) {
