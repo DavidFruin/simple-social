@@ -1035,6 +1035,13 @@ footer {
   #thumb-nav {
     display: block;
   }
+
+  /* The bubble replaces the header's links rather than doubling up with
+     them. Only the logged-in nav carries #main-nav, so the logged-out
+     header keeps its links -- there's no bubble to fall back on there. */
+  #main-nav {
+    display: none;
+  }
 }
 
 .thumb-nav-toggle {
