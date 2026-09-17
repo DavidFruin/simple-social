@@ -3,6 +3,8 @@ const SearchPage = {
   users: [],
   filteredUsers: [],
   followingStatus: {},
+  pageSize: 25,
+  visibleCount: 25,
 
   render(container) {
     this.isActive = true;
@@ -19,8 +21,13 @@ const SearchPage = {
         
         <div id="users-list" class="users-list"></div>
         <div id="loading-indicator" class="hidden">Loading...</div>
+        <div class="load-more-container">
+          <button id="load-more-btn" class="btn btn-secondary hidden">Load More</button>
+        </div>
       </div>
     `;
+
+    this.visibleCount = this.pageSize;
 
     this.loadAllUsers();
     this.attachEventListeners();
@@ -40,8 +47,12 @@ const SearchPage = {
         this.filterUsers(query);
       } else {
         dropdown.classList.add('hidden');
-        this.renderUsersList(this.users);
       }
+    });
+
+    document.getElementById('load-more-btn')?.addEventListener('click', () => {
+      this.visibleCount += this.pageSize;
+      this.renderUsersList();
     });
 
     input?.addEventListener('blur', () => {
@@ -58,17 +69,18 @@ const SearchPage = {
     loading?.classList.remove('hidden');
 
     try {
-      const result = await api.getUsers();
+      const [result, follows] = await Promise.all([api.getUsers(), api.getMyFollows()]);
+      if (!this.isActive) return;
       this.users = (result.users || []).sort((a, b) => {
         const dateA = new Date(a.created_at || 0);
         const dateB = new Date(b.created_at || 0);
         return dateB - dateA;
       });
+      this.followingStatus = {};
+      (follows.follows || []).forEach(f => { this.followingStatus[f.id] = true; });
 
       loading?.classList.add('hidden');
-      await this.checkFollowingStatus();
-      if (!this.isActive) return;
-      this.renderUsersList(this.users);
+      this.renderUsersList();
     } catch (err) {
       loading?.classList.add('hidden');
       showError(err.message);
@@ -95,25 +107,13 @@ const SearchPage = {
     dropdown.classList.remove('hidden');
   },
 
-  async checkFollowingStatus() {
-    const currentUser = Store.getUser();
-    const promises = this.users
-      .filter(u => (u.id || u.userId) != currentUser?.id)
-      .map(async u => {
-        try {
-          const result = await api.isFollowing(u.id || u.userId);
-          this.followingStatus[u.id || u.userId] = result.following;
-        } catch {
-          this.followingStatus[u.id || u.userId] = false;
-        }
-      });
-
-    await Promise.all(promises);
-  },
-
-  renderUsersList(users) {
+  renderUsersList() {
     const container = document.getElementById('users-list');
+    const loadMoreBtn = document.getElementById('load-more-btn');
     const currentUser = Store.getUser();
+    const users = this.users.slice(0, this.visibleCount);
+
+    loadMoreBtn?.classList.toggle('hidden', this.visibleCount >= this.users.length);
 
     if (users.length === 0) {
       container.innerHTML = '<p class="search-hint">No users found.</p>';
