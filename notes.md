@@ -29,7 +29,5 @@ once logged in there's no way to reach the about, api, code of conduct, or downl
 liking and unliking a post causes weird flashing
 
 STYLE ERRORS
-truncated posts only show "..." as a hint that there's more text, easy to miss that you need to expand the post to read the rest
-make newest commments on the bottom not the top of the comments
 
 MOBILE STYLE ERRORS
