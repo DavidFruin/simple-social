@@ -122,10 +122,10 @@ const CreatePostPage = {
     try {
       const isImage = file.type.startsWith('image/');
       const upload = isImage ? await this.renderImageFile(file, 0) : file;
-      await this.uploadAndReplace(upload);
+      const result = await this.uploadAndReplace(upload);
       this.originalImage = isImage ? file : null;
       this.imageRotation = 0;
-      this.renderMediaPreview({ mediaUrl: this.currentMediaUrl, type: this.currentMediaType });
+      this.renderMediaPreview(result);
       status.textContent = 'Uploaded!';
       selectMediaBtn.textContent = 'Change Media';
     } catch (err) {
@@ -218,7 +218,7 @@ const CreatePostPage = {
     const preview = document.getElementById('media-preview');
     if (!preview) return;
 
-    const url = mediaData.thumbnailUrl || mediaData.mediaUrl;
+    const url = mediaData.mediaUrl;
     const type = mediaData.type;
 
     if (type === 'image') {
@@ -232,7 +232,7 @@ const CreatePostPage = {
     } else if (type === 'video') {
       preview.innerHTML = `
         <div class="media-preview-item video">
-          <video src="${url}"></video>
+          <video src="${url}" poster="${mediaData.thumbnailUrl || ''}" preload="metadata" playsinline></video>
           <button type="button" class="media-remove-btn" onclick="CreatePostPage.clearMedia()">×</button>
         </div>
       `;

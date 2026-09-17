@@ -49,23 +49,21 @@ function createMediaHtml(mediaUrl) {
   const isAudio = mediaUrl.includes('/audio/');
   const isImage = mediaUrl.includes('/image/');
 
-  let thumbnailUrl = mediaUrl;
-  if (isVideo) {
-    thumbnailUrl = mediaUrl.replace('/video/', '/video/thumb_');
-  }
-
   if (isImage) {
     return `
       <div class="post-media" data-full-url="${escapeHtml(mediaUrl)}" data-type="image">
-        <img src="${escapeHtml(thumbnailUrl)}" alt="Post media" class="media-thumbnail">
+        <img src="${escapeHtml(mediaUrl)}" alt="Post media" class="media-thumbnail">
       </div>
     `;
   }
 
   if (isVideo) {
+    // The server saves a WebP of the first frame as thumb_<name>.webp. Older
+    // videos have none, in which case the browser shows the video's own frame.
+    const posterUrl = mediaUrl.replace(/\/video\/([^/]+)\.[^./]+$/, '/video/thumb_$1.webp');
     return `
       <div class="post-media" data-full-url="${escapeHtml(mediaUrl)}" data-type="video">
-        <video src="${escapeHtml(thumbnailUrl)}" class="media-thumbnail" poster="${escapeHtml(thumbnailUrl)}" muted></video>
+        <video src="${escapeHtml(mediaUrl)}" class="media-thumbnail" poster="${escapeHtml(posterUrl)}" preload="metadata" muted playsinline></video>
         <div class="video-play-icon">▶</div>
       </div>
     `;

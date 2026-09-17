@@ -464,7 +464,7 @@ function handle_deleteAccount($pdo, $user) {
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $f = __DIR__ . $r['path'];
         if (strpos($r['path'], '..') === false && file_exists($f)) @unlink($f);
-        $tf = str_replace('/video/', '/video/thumb_', $f);
+        $tf = preg_replace('#/video/([^/]+)\.[^./]+$#', '/video/thumb_$1.webp', $f);
         if (file_exists($tf)) @unlink($tf);
     }
     $pdo->prepare('DELETE FROM media WHERE user_id = ?')->execute([$uid]);
@@ -992,7 +992,7 @@ function handle_deletePost($pdo, $user) {
                 $mediaFile = __DIR__ . $mediaRow['path'];
                 if (file_exists($mediaFile)) unlink($mediaFile);
                 if (strpos($mediaRow['path'], '/video/') !== false) {
-                    $thumbFile = str_replace('/video/', '/video/thumb_', $mediaFile);
+                    $thumbFile = preg_replace('#/video/([^/]+)\.[^./]+$#', '/video/thumb_$1.webp', $mediaFile);
                     if (file_exists($thumbFile)) unlink($thumbFile);
                 }
                 $stmt = $pdo->prepare('DELETE FROM media WHERE id = ?');

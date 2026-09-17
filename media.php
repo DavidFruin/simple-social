@@ -126,11 +126,38 @@ function getMediaType($mimeType) {
     return null;
 }
 
-function getOutputExtension($type) {
-    if ($type === 'image') return 'webp';
-    if ($type === 'video') return 'webm'; // Will convert to mp4, but save as webm initially
-    if ($type === 'audio') return 'webm'; // Will convert to mp3, but save as webm initially
-    return null;
+// Extension to keep an unconverted file under, based on what it really is.
+function originalExtension($mimeType, $fileName) {
+    $byMime = [
+        'video/mp4' => 'mp4', 'video/quicktime' => 'mov', 'video/m4v' => 'm4v', 'video/webm' => 'webm',
+        'audio/mpeg' => 'mp3', 'audio/mp3' => 'mp3', 'audio/wav' => 'wav', 'audio/webm' => 'webm',
+    ];
+    return $byMime[$mimeType] ?? strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+}
+
+const FFMPEG = '/usr/bin/ffmpeg';
+
+// Runs ffmpeg with the given arguments (each shell-escaped). Returns true on success.
+function runFfmpeg($args) {
+    if (!function_exists('exec')) {
+        logMsg("ffmpeg skipped: exec() is disabled");
+        return false;
+    }
+    @set_time_limit(600);
+    $cmd = escapeshellarg(FFMPEG) . ' -hide_banner -loglevel error -y '
+        . implode(' ', array_map('escapeshellarg', $args)) . ' 2>&1';
+    $output = [];
+    $code = 1;
+    $start = microtime(true);
+    exec($cmd, $output, $code);
+    $seconds = round(microtime(true) - $start, 1);
+    logMsg("ffmpeg exit=$code time={$seconds}s " . substr(implode(' ', $output), 0, 1000));
+    return $code === 0;
+}
+
+// Scale filter keeping the longest side at most $max px, with even dimensions for H.264.
+function ffmpegScale($max) {
+    return "scale='trunc(min(1,$max/max(iw,ih))*iw/2)*2':'trunc(min(1,$max/max(iw,ih))*ih/2)*2'";
 }
 
 // Phones save photos sideways plus an EXIF tag saying which way is up. GD
@@ -242,40 +269,52 @@ function processImage($inputPath, $outputPath) {
     return true;
 }
 
-function processVideo($inputPath, $outputPath, $thumbnailPath) {
-    logMsg("processVideo: input=$inputPath output=$outputPath");
-    
-    if (!file_exists($inputPath)) {
-        logMsg("processVideo ERROR: input file does not exist");
-        return false;
+// Converts to MP4 (H.264/AAC) so it plays everywhere, and saves a WebP of the
+// first frame as the thumbnail. If ffmpeg can't convert, keeps the original
+// file. Returns the saved file's extension, or false on failure.
+function processVideo($inputPath, $outputBase, $originalExt, $thumbnailPath) {
+    logMsg("processVideo: input=$inputPath output=$outputBase");
+
+    $converted = runFfmpeg([
+        '-i', $inputPath, '-vf', ffmpegScale(1920),
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', "$outputBase.mp4",
+    ]);
+    if ($converted) {
+        $ext = 'mp4';
+    } else {
+        @unlink("$outputBase.mp4");
+        if (!copy($inputPath, "$outputBase.$originalExt")) return false;
+        $ext = $originalExt;
     }
-    
-    // Skip ffmpeg processing - just copy the file directly
-    if (!copy($inputPath, $outputPath)) {
-        logMsg("processVideo ERROR: failed to copy file");
-        return false;
-    }
-    
-    logMsg("processVideo SUCCESS: copied to $outputPath");
-    return true;
+
+    createVideoThumbnail("$outputBase.$ext", $thumbnailPath);
+    logMsg("processVideo SUCCESS: saved $outputBase.$ext");
+    return $ext;
 }
 
-function processAudio($inputPath, $outputPath) {
-    logMsg("processAudio: input=$inputPath output=$outputPath");
-    
-    if (!file_exists($inputPath)) {
-        logMsg("processAudio ERROR: input file does not exist");
-        return false;
+// ffmpeg grabs the first frame as PNG; GD converts it to WebP.
+function createVideoThumbnail($videoPath, $thumbnailPath) {
+    $png = "$thumbnailPath.png";
+    if (!runFfmpeg(['-i', $videoPath, '-frames:v', '1', '-vf', ffmpegScale(640), $png])) return false;
+    $img = @imagecreatefrompng($png);
+    @unlink($png);
+    if (!$img) return false;
+    $ok = imagewebp($img, $thumbnailPath, 80);
+    imagedestroy($img);
+    return $ok;
+}
+
+// Converts to MP3. Files that are already MP3 are kept as-is, and if ffmpeg
+// can't convert, the original is kept. Returns the saved extension, or false.
+function processAudio($inputPath, $outputBase, $originalExt) {
+    logMsg("processAudio: input=$inputPath output=$outputBase");
+
+    if ($originalExt !== 'mp3') {
+        if (runFfmpeg(['-i', $inputPath, '-vn', '-c:a', 'libmp3lame', '-q:a', '2', "$outputBase.mp3"])) return 'mp3';
+        @unlink("$outputBase.mp3");
     }
-    
-    // Skip ffmpeg processing - just copy the file directly
-    if (!copy($inputPath, $outputPath)) {
-        logMsg("processAudio ERROR: failed to copy file");
-        return false;
-    }
-    
-    logMsg("processAudio SUCCESS: copied to $outputPath");
-    return true;
+    return copy($inputPath, "$outputBase.$originalExt") ? $originalExt : false;
 }
 
 function handle_uploadMedia() {
@@ -293,7 +332,8 @@ function handle_uploadMedia() {
     
     $file = $_FILES['file'];
     $tmpPath = $file['tmp_name'];
-    $mimeType = $file['type'];
+    // Browsers may add codec parameters, e.g. "video/mp4;codecs=avc1".
+    $mimeType = strtolower(trim(explode(';', $file['type'])[0]));
     $fileSize = $file['size'];
     $fileName = $file['name'];
     
@@ -307,10 +347,9 @@ function handle_uploadMedia() {
         bad("File too large. Max: $maxMb MB", 400);
     }
     
-    $ext = getOutputExtension($mediaType);
     $timestamp = date('YmdHis');
     $random = sprintf('%06d', mt_rand(0, 999999));
-    $filename = "{$uid}_{$mediaType}_{$timestamp}_{$random}.{$ext}";
+    $base = "{$uid}_{$mediaType}_{$timestamp}_{$random}";
     
     ensureMediaDir($uid, $mediaType);
     $mediaDir = getMediaDir($uid);
@@ -318,7 +357,7 @@ function handle_uploadMedia() {
     logMsg("uploadMedia: mediaDir=$mediaDir typeDir=$typeDir exists=" . (is_dir($typeDir) ? "yes" : "no"));
     
     $inputExt = pathinfo($fileName, PATHINFO_EXTENSION);
-    $tempInput = "{$mediaDir}/{$mediaType}/temp_input.{$inputExt}";
+    $tempInput = "{$typeDir}/temp_{$base}.{$inputExt}";
     
     if (!move_uploaded_file($tmpPath, $tempInput)) {
         logMsg("uploadMedia ERROR: move_uploaded_file failed. tmpPath=$tmpPath, tempInput=$tempInput");
@@ -327,35 +366,28 @@ function handle_uploadMedia() {
     
     logMsg("uploadMedia: tempInput=$tempInput exists=" . (file_exists($tempInput) ? "yes" : "no"));
     
-    $outputPath = "{$mediaDir}/{$mediaType}/{$filename}";
-    $thumbnailPath = ($mediaType === 'video') ? "{$mediaDir}/{$mediaType}/thumb_{$filename}" : null;
+    $originalExt = originalExtension($mimeType, $fileName);
+    $thumbnailPath = "{$typeDir}/thumb_{$base}.webp";
     
     if ($mediaType === 'image') {
-        if (!processImage($tempInput, $outputPath)) {
-            @unlink($tempInput);
-            bad('Failed to process image', 500);
-        }
+        $ext = processImage($tempInput, "{$typeDir}/{$base}.webp") ? 'webp' : false;
     } elseif ($mediaType === 'video') {
-        if (!processVideo($tempInput, $outputPath, $thumbnailPath)) {
-            @unlink($tempInput);
-            bad('Failed to process video', 500);
-        }
-    } elseif ($mediaType === 'audio') {
-        if (!processAudio($tempInput, $outputPath)) {
-            @unlink($tempInput);
-            bad('Failed to process audio', 500);
-        }
+        $ext = processVideo($tempInput, "{$typeDir}/{$base}", $originalExt, $thumbnailPath);
+    } else {
+        $ext = processAudio($tempInput, "{$typeDir}/{$base}", $originalExt);
     }
     
     @unlink($tempInput);
+    if (!$ext) bad("Failed to process $mediaType", 500);
     
+    $filename = "{$base}.{$ext}";
     $pdo = db();
     $stmt = $pdo->prepare('INSERT INTO media (user_id, filename, type, path, created_at) VALUES (?, ?, ?, ?, ?)');
     $path = "/media/{$uid}/{$mediaType}/{$filename}";
     $stmt->execute([$uid, $filename, $mediaType, $path, date('Y-m-d H:i:s')]);
     $mediaId = $pdo->lastInsertId();
     
-    $thumbUrl = ($mediaType === 'video') ? "/media/{$uid}/video/thumb_{$filename}" : null;
+    $thumbUrl = ($mediaType === 'video' && file_exists($thumbnailPath)) ? "/media/{$uid}/video/thumb_{$base}.webp" : null;
     
     logMsg("uploadMedia SUCCESS: mediaId=$mediaId path=$path");
     
@@ -386,8 +418,7 @@ function handle_deleteMedia() {
     if (file_exists($filePath)) unlink($filePath);
     
     if ($media['type'] === 'video') {
-        $thumbPath = str_replace('/media/' . $uid . '/video/', '/video/thumb_', $media['path']);
-        $fullThumbPath = $mediaDir . $thumbPath;
+        $fullThumbPath = $mediaDir . '/video/thumb_' . pathinfo($media['path'], PATHINFO_FILENAME) . '.webp';
         if (file_exists($fullThumbPath)) unlink($fullThumbPath);
     }
     

@@ -745,7 +745,13 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                     <div class="endpoint" id="uploadMedia">
                         <h3>uploadMedia</h3>
                         <p class="endpoint-meta">POST /media.php &middot; multipart/form-data &middot; Auth: required</p>
-                        <p>Uploads a file to attach to a post. Pass the returned <code>mediaUrl</code> to <a href="#post"><code>post</code></a>. Images are turned upright using their EXIF orientation, converted to WebP, and scaled down so the longest side is at most 1920px. <code>mediaId</code> is returned as a string.</p>
+                        <p>Uploads a file to attach to a post. Pass the returned <code>mediaUrl</code> to <a href="#post"><code>post</code></a>. <code>mediaId</code> is returned as a string.</p>
+                        <ul>
+                            <li><strong>Images</strong> are turned upright using their EXIF orientation, converted to WebP, and scaled so the longest side is at most 1920px.</li>
+                            <li><strong>Video</strong> is converted to MP4 (H.264/AAC) with the longest side at most 1920px. <code>thumbnailUrl</code> is a WebP of the first frame.</li>
+                            <li><strong>Audio</strong> is converted to MP3.</li>
+                            <li>If a video or audio file can't be converted, the original is kept, so check the extension of <code>mediaUrl</code> rather than assuming the format. <code>thumbnailUrl</code> is <code>null</code> for images, audio, and videos without a thumbnail.</li>
+                        </ul>
                         <table>
                             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
                             <tr><td><code>action</code></td><td>yes</td><td><code>uploadMedia</code></td></tr>
