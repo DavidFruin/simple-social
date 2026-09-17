@@ -42,7 +42,7 @@ const CreatePostPage = {
                   <button type="button" class="capture-close" onclick="CreatePostPage.closeCaptureModal()">×</button>
                 </div>
                 <div class="capture-preview">
-                  <video id="capture-video" autoplay playsinline></video>
+                  <video id="capture-video" autoplay playsinline muted></video>
                   <canvas id="capture-canvas" class="hidden"></canvas>
                   <div id="capture-audio-viz" class="capture-audio-viz hidden">
                     <div class="cava-bars"></div>
@@ -197,6 +197,8 @@ const CreatePostPage = {
       });
 
       this.captureStream = stream;
+      // Mute the live preview so the microphone isn't played back through the speakers.
+      video.muted = true;
       video.srcObject = stream;
       video.style.display = 'block';
 
@@ -311,6 +313,7 @@ const CreatePostPage = {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         this.captureStream = stream;
+        video.muted = true;
         video.srcObject = stream;
         video.style.display = 'block';
       } catch (err) {
