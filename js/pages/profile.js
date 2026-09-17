@@ -5,9 +5,14 @@ const ProfilePage = {
   commentCounts: {},
   postsClickHandler: null,
   postsContainerEl: null,
+  loadMoreClickHandler: null,
   isOwnProfile: false,
   followersCount: 0,
   followingCount: 0,
+  offset: 0,
+  limit: 25,
+  hasMore: true,
+  loading: false,
 
   render(container, userId) {
     this.isActive = true;
@@ -28,9 +33,19 @@ const ProfilePage = {
         <h2>Posts</h2>
         <div id="posts-container"></div>
         <div id="loading-indicator" class="hidden">Loading...</div>
+        <div class="load-more-container">
+          <button id="load-more-btn" class="btn btn-secondary hidden">Load More</button>
+        </div>
         <div id="empty-posts" class="hidden">No posts yet.</div>
       </div>
     `;
+
+    this.offset = 0;
+    this.posts = [];
+    this.hasMore = true;
+
+    this.loadMoreClickHandler = () => this.loadMorePosts();
+    document.getElementById('load-more-btn')?.addEventListener('click', this.loadMoreClickHandler);
 
     this.loadProfile();
   },
@@ -42,6 +57,7 @@ const ProfilePage = {
       this.postsClickHandler = null;
       this.postsContainerEl = null;
     }
+    this.loadMoreClickHandler = null;
   },
 
   async loadProfile() {
@@ -56,7 +72,7 @@ const ProfilePage = {
     try {
       const [userInfo, posts, follows, followers, following] = await Promise.all([
         api.getUserInfo(this.userId),
-        api.getUserPosts(this.userId),
+        api.getUserPosts(this.userId, 0, this.limit),
         api.getMyFollows(),
         api.getFollowers(this.userId),
         api.getFollows(this.userId)
@@ -66,6 +82,8 @@ const ProfilePage = {
 
       this.user = userInfo;
       this.posts = posts.posts || [];
+      this.hasMore = !!posts.hasMore;
+      this.offset = this.posts.length;
       this.followersCount = (followers.followers || []).length;
       this.followingCount = (following.follows || []).length;
       
@@ -90,6 +108,39 @@ const ProfilePage = {
       this.attachDropdownListeners();
     } catch (err) {
       this.showError(err.message);
+    }
+  },
+
+  async loadMorePosts() {
+    if (!this.hasMore || this.loading || !this.userId) return;
+    this.loading = true;
+    document.getElementById('loading-indicator')?.classList.remove('hidden');
+
+    try {
+      const result = await api.getUserPosts(this.userId, this.offset, this.limit);
+      if (!this.isActive) return;
+
+      this.posts = [...this.posts, ...(result.posts || [])];
+      this.hasMore = !!result.hasMore;
+      this.offset = this.posts.length;
+
+      const postIds = this.posts.map(p => p.id).filter(id => id);
+      if (postIds.length > 0) {
+        try {
+          const counts = await api.getPostCommentCounts(postIds);
+          if (!this.isActive) return;
+          this.commentCounts = { ...this.commentCounts, ...counts.counts };
+        } catch (err) {
+          console.error('Failed to load comment counts:', err);
+        }
+      }
+
+      this.renderPosts();
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      this.loading = false;
+      document.getElementById('loading-indicator')?.classList.add('hidden');
     }
   },
 
@@ -135,24 +186,26 @@ const ProfilePage = {
     const container = document.getElementById('posts-container');
     const emptyState = document.getElementById('empty-posts');
     const loading = document.getElementById('loading-indicator');
-    
+    const loadMoreBtn = document.getElementById('load-more-btn');
+
     if (!this.userId) {
       container.innerHTML = '<div class="loading">Loading posts...</div>';
       return;
     }
-    
+
     loading?.classList.add('hidden');
 
     if (this.posts.length === 0) {
       container.innerHTML = '';
       emptyState?.classList.remove('hidden');
+      loadMoreBtn?.classList.add('hidden');
       return;
     }
 
     emptyState?.classList.add('hidden');
-    
+
     const user = Store.getUser();
-    
+
 container.innerHTML = this.posts.map(post => {
       const isLiked = this.isOwnProfile ? post.likes?.some(l => l.userId === Store.getUser()?.id) : false;
       const likeCount = post.likes ? post.likes.length : 0;
@@ -165,6 +218,8 @@ container.innerHTML = this.posts.map(post => {
         commentCount: commentCount
       });
     }).join('');
+
+    loadMoreBtn?.classList.toggle('hidden', !this.hasMore);
 
     this.attachPostEventListeners();
   },

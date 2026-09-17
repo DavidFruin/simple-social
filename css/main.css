@@ -173,6 +173,11 @@ footer {
   color: var(--color-text);
 }
 
+.load-more-container {
+  text-align: center;
+  margin: var(--spacing-md) 0;
+}
+
 .btn-danger {
   background: var(--color-error);
   color: white;

@@ -10,15 +10,19 @@ const FeedPage = {
   scrollDebounce: null,
   postsClickHandler: null,
   postsContainerEl: null,
+  loadMoreClickHandler: null,
 
   render(container) {
     this.isActive = true;
     container.innerHTML = `
       <div class="page-container">
         <h1>News Feed</h1>
-        
+
         <div id="posts-container"></div>
         <div id="loading-indicator" class="hidden">Loading...</div>
+        <div class="load-more-container">
+          <button id="load-more-btn" class="btn btn-secondary hidden">Load More</button>
+        </div>
         <div id="empty-feed" class="hidden">
           <p>Your feed is empty.</p>
           <p>Follow some users or create your first post!</p>
@@ -46,6 +50,9 @@ const FeedPage = {
       }, 150);
     };
     window.addEventListener('scroll', this.scrollHandler);
+
+    this.loadMoreClickHandler = () => this.loadMorePosts();
+    document.getElementById('load-more-btn')?.addEventListener('click', this.loadMoreClickHandler);
   },
 
   destroy() {
@@ -63,6 +70,7 @@ const FeedPage = {
       this.postsClickHandler = null;
       this.postsContainerEl = null;
     }
+    this.loadMoreClickHandler = null;
   },
 
   async loadPosts() {
@@ -121,17 +129,21 @@ const FeedPage = {
   renderPosts() {
     const container = document.getElementById('posts-container');
     const emptyState = document.getElementById('empty-feed');
+    const loadMoreBtn = document.getElementById('load-more-btn');
 
     if (this.posts.length === 0) {
       container.innerHTML = '';
       emptyState?.classList.remove('hidden');
+      loadMoreBtn?.classList.add('hidden');
       return;
     }
 
     emptyState?.classList.add('hidden');
-    
+
     container.innerHTML = this.posts.map(post => this.renderPostCard(post)).join('');
-    
+
+    loadMoreBtn?.classList.toggle('hidden', !this.hasMore);
+
     this.attachPostEventListeners();
   },
 
