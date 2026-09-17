@@ -19,8 +19,8 @@ add notifications badge to pwa
 
 BUGS
 while media lighthouse open page can still scroll
-resetPassword api action doesn't check the OTP so anyone who knows an email can change that account's password (security)
-finishRegister api action doesn't check the OTP so someone can register an email they don't own (security)
+OTP codes have no attempt limit so someone could guess the 6 digit code within the 10 minutes (security)
+resetPassword api action doesn't enforce the password rules (8-25 chars, upper, lower, number, symbol), only the website checks them (security)
 log api action always returns 401 so front end errors never get logged on the server
 profile page adds a document click listener every visit that never gets removed so they pile up
 api-documentation.md is out of date now that api.html exists
