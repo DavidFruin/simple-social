@@ -62,6 +62,19 @@ const Store = {
     return this.state.user?.theme || 'light';
   },
 
+  // Not persisted, not part of reactive state -- just lets the single-post
+  // page skip its loading flash when it already has the post's data from
+  // whatever feed/profile card the user just clicked "Expand" on.
+  postCache: {},
+
+  cachePost(post) {
+    if (post?.id) this.postCache[post.id] = post;
+  },
+
+  getCachedPost(id) {
+    return this.postCache[id] || null;
+  },
+
   // Which bottom corner the thumb nav sits in. Right-handed by default.
   getHand() {
     return this.state.user?.hand || 'right';

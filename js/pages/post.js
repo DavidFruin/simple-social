@@ -21,14 +21,19 @@ const PostPage = {
     this.timestamp = parts[1];
     this.postId = postId;
 
+    // If we got here via "Expand" from feed/profile, that page's card already
+    // handed us this exact post -- render it immediately instead of showing
+    // a loading state just to re-fetch data we already have.
+    const cached = Store.getCachedPost(postId);
+
     container.innerHTML = `
       <div class="page-container">
         <a href="javascript:void(0)" class="back-link" id="back-link">← Back</a>
-        
+
         <div id="post-container">
-          <div class="loading">Loading post...</div>
+          ${cached ? '' : '<div class="loading">Loading post...</div>'}
         </div>
-        
+
         <h2>Comments</h2>
         <div class="comment-form">
           <form id="comment-form">
@@ -36,7 +41,7 @@ const PostPage = {
             <button type="submit" class="btn btn-primary">Post Comment</button>
           </form>
         </div>
-        
+
         <div id="comments-container"></div>
         <div id="loading-comments" class="hidden">Loading comments...</div>
         <div id="empty-comments" class="hidden">No comments yet. Be the first to comment!</div>
@@ -44,7 +49,13 @@ const PostPage = {
     `;
 
     this.attachEventListeners();
-    this.loadPost();
+
+    if (cached) {
+      this.post = cached;
+      this.renderPost();
+    } else {
+      this.loadPost();
+    }
     this.loadComments();
   },
 

@@ -1,6 +1,11 @@
 // components/post-card.js - Post Card Component
 
 function createPostCard(post, options = {}) {
+  // So the single-post page can render this exact post instantly if the user
+  // taps "Expand" on it, instead of showing a loading state and re-fetching
+  // data we already have right here.
+  Store.cachePost(post);
+
   const {
     showLikeDropdown = true,
     showExpandLink = true,
