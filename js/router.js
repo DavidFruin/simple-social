@@ -23,8 +23,13 @@ const Router = {
 
   init() {
     document.addEventListener('click', (e) => {
-      const link = e.target.closest('a[href^="#/"]');
-      if (link && link.getAttribute('href') !== window.location.hash) {
+      const link = e.target.closest('a');
+      // .hash (not getAttribute('href')) so this catches header.js's nav,
+      // which uses absolute hrefs like "/app.html#/settings" to also work
+      // from the static marketing pages -- those never start with "#/", so
+      // matching on the raw attribute missed every header/thumb-nav click
+      // and misclassified it as a back/forward restore instead of fresh.
+      if (link && link.hash && link.hash.startsWith('#/') && link.hash !== window.location.hash) {
         this.pendingFresh = true;
       }
     }, true);
