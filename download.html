@@ -70,7 +70,21 @@
                     <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
 
                     <h2>Interactive CLI</h2>
-                    <p>A guided command-line client that prompts you for each step. Installation instructions are coming soon.</p>
+                    <p>A guided command-line client that prompts you for each step. It's a separate program that uses the CLI above, so build the CLI first, then run these from the <strong>same folder</strong> you ran the CLI's <code>git clone</code> in (not inside the <code>simple-social-cli</code> folder). Debian and Ubuntu only for now, same as the CLI.</p>
+
+                    <p>1. Clone the repo:</p>
+                    <div class="code-block">
+                        <pre><code>git clone https://github.com/DavidFruin/simple-social-cli-interactive.git</code></pre>
+                        <button class="copy-btn" data-copy="git clone https://github.com/DavidFruin/simple-social-cli-interactive.git">Copy</button>
+                    </div>
+
+                    <p>2. Build it:</p>
+                    <div class="code-block">
+                        <pre><code>cd simple-social-cli-interactive &amp;&amp; make</code></pre>
+                        <button class="copy-btn" data-copy="cd simple-social-cli-interactive && make">Copy</button>
+                    </div>
+
+                    <p>Then run it with <code>./simple-social-cli-interactive</code> from inside that folder.</p>
 
                     <h2>TUI</h2>
                     <p>A full-screen terminal interface. Installation instructions are coming soon.</p>
