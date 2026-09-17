@@ -1161,7 +1161,7 @@ footer {
   margin: var(--spacing-md) 0;
   border-radius: var(--border-radius);
   overflow: hidden;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg);
 }
 
 .post-media img.media-thumbnail,
@@ -1186,7 +1186,7 @@ footer {
 
 .post-media[data-type="video"] {
   position: relative;
-  background: #000;
+  background: var(--color-bg);
 }
 
 .post-media audio {
