@@ -22,7 +22,6 @@ while media lighthouse open page can still scroll
 
 STYLE ERRORS
 truncated posts only show "..." as a hint that there's more text, easy to miss that you need to expand the post to read the rest
-don't display the like button on your own posts
 make date commented line up on comments of posts on expanded post view
 make newest commments on the bottom not the top of the comments
 errors should be in a error log in the console not displayed to the user
