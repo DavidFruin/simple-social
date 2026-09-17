@@ -147,7 +147,9 @@ const PostPage = {
     try {
       const result = await api.getPostComments(this.postId);
       if (!this.isActive) return;
-      this.comments = result.comments || [];
+      // The API returns newest-first; reverse so the newest comment ends up
+      // at the bottom of the list instead of the top.
+      this.comments = (result.comments || []).slice().reverse();
       
       loading?.classList.add('hidden');
       this.renderComments();
@@ -287,7 +289,7 @@ const PostPage = {
       if (!this.isActive) return;
       const user = Store.getUser();
       
-      this.comments.unshift({
+      this.comments.push({
         id: result.commentId,
         post_id: this.postId,
         user_id: user?.id,
