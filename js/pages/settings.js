@@ -11,7 +11,7 @@ const SettingsPage = {
           <form id="delete-form">
             <div class="form-group">
               <label for="password">Enter your password to confirm</label>
-              <input type="password" id="password" name="password" required autocomplete="current-password">
+              <input type="password" class="form-input" id="password" name="password" required autocomplete="current-password">
             </div>
             <div id="delete-message"></div>
             <button type="submit" class="btn btn-danger">Delete My Account</button>

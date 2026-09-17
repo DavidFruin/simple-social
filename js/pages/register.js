@@ -12,7 +12,7 @@ const RegisterPage = {
             <form id="email-form">
               <div class="form-group">
                 <label for="email">Email</label>
-                <input type="email" id="email" name="email" required autocomplete="email" placeholder="your@email.com">
+                <input type="email" class="form-input" id="email" name="email" required autocomplete="email" placeholder="your@email.com">
               </div>
               <div id="email-message"></div>
               <button type="submit" class="btn btn-primary">Send Verification Code</button>
@@ -24,7 +24,7 @@ const RegisterPage = {
             <form id="otp-form">
               <div class="form-group">
                 <label for="otp">Verification Code</label>
-                <input type="text" id="otp" name="otp" required maxlength="6" pattern="[0-9]{6}" placeholder="000000" autocomplete="one-time-code">
+                <input type="text" class="form-input" id="otp" name="otp" required maxlength="6" pattern="[0-9]{6}" placeholder="000000" autocomplete="one-time-code">
               </div>
               <div id="otp-message"></div>
               <button type="submit" class="btn btn-primary">Verify Code</button>
@@ -37,7 +37,7 @@ const RegisterPage = {
             <form id="password-form">
               <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required minlength="8" maxlength="25" autocomplete="new-password">
+                <input type="password" class="form-input" id="password" name="password" required minlength="8" maxlength="25" autocomplete="new-password">
                 <div id="password-requirements" class="requirements">
                   <div data-req="length">8-25 characters</div>
                   <div data-req="lower">Lowercase letter</div>
@@ -48,7 +48,7 @@ const RegisterPage = {
               </div>
               <div class="form-group">
                 <label for="confirm">Confirm Password</label>
-                <input type="password" id="confirm" name="confirm" required autocomplete="new-password">
+                <input type="password" class="form-input" id="confirm" name="confirm" required autocomplete="new-password">
               </div>
               <div id="password-message"></div>
               <button type="submit" class="btn btn-primary">Create Account</button>

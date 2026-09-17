@@ -25,7 +25,7 @@ const SessionExpiredModal = {
         <p class="session-modal-email">Logged in as ${escapeHtml(email)}</p>
         <form id="session-relogin-form">
           <div class="form-group">
-            <input type="password" id="session-relogin-password" placeholder="Enter your password" required autocomplete="current-password">
+            <input type="password" id="session-relogin-password" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
           </div>
           <div id="session-relogin-error" class="error-message hidden"></div>
           <button type="submit" class="btn btn-primary btn-full">Re-login</button>

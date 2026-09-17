@@ -8,11 +8,11 @@ const LoginPage = {
           <form id="login-form">
             <div class="form-group">
               <label for="email">Email</label>
-              <input type="email" id="email" name="email" required autocomplete="email">
+              <input type="email" class="form-input" id="email" name="email" required autocomplete="email">
             </div>
             <div class="form-group">
               <label for="password">Password</label>
-              <input type="password" id="password" name="password" required autocomplete="current-password">
+              <input type="password" class="form-input" id="password" name="password" required autocomplete="current-password">
             </div>
             <div id="login-message"></div>
             <button type="submit" class="btn btn-primary">Login</button>
