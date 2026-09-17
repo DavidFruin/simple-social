@@ -159,6 +159,10 @@ function good($data = []) {
     return array_merge(['valid' => true], $data);
 }
 
+// Stored in place of an OTP once it has been verified. It can never match a
+// submitted code because verify actions only accept 6 digits.
+const OTP_VERIFIED = 'VERIFIED';
+
 function validateContent($text, $errorMsg = 'You are trying to post illegal characters') {
     if (preg_match('/[^\x20-\x7E\n\r\xA0-\xFF]/u', $text)) bad($errorMsg, 400);
 }
@@ -223,6 +227,7 @@ function handle_sendOTP($pdo) {
 function handle_verifyOTP($pdo) {
     $email = trim($_POST['email'] ?? '');
     $otp = trim($_POST['otp'] ?? '');
+    if (!preg_match('/^\d{6}$/', $otp)) bad('Incorrect OTP', 400);
 
     $stmt = $pdo->prepare('SELECT id, reset_otp, reset_expires FROM users WHERE LOWER(email) = LOWER(?)');
     $stmt->execute([$email]);
@@ -231,8 +236,9 @@ function handle_verifyOTP($pdo) {
     if (time() > $row['reset_expires']) bad('OTP has expired. Please request a new one.', 400);
     if ($otp !== $row['reset_otp']) bad('Incorrect OTP', 400);
 
-    $stmt = $pdo->prepare('UPDATE users SET reset_otp = NULL, reset_expires = 0 WHERE id = ?');
-    $stmt->execute([$row['id']]);
+    // Mark verified so resetPassword can require it (valid 10 more minutes).
+    $stmt = $pdo->prepare('UPDATE users SET reset_otp = ?, reset_expires = ? WHERE id = ?');
+    $stmt->execute([OTP_VERIFIED, time() + 600, $row['id']]);
     respond(good(['message' => 'OTP verified! Set your new password.']));
 }
 
@@ -242,14 +248,17 @@ function handle_resetPassword($pdo) {
     $confirm = $_POST['confirm'] ?? '';
     if (!$email || !$password || $password !== $confirm) bad('Passwords do not match or are empty', 400);
 
-    $stmt = $pdo->prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)');
+    $stmt = $pdo->prepare('SELECT id, reset_otp, reset_expires FROM users WHERE LOWER(email) = LOWER(?)');
     $stmt->execute([$email]);
-    $userId = $stmt->fetchColumn();
-    if (!$userId) bad('User not found', 404);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) bad('User not found', 404);
+    if ($row['reset_otp'] !== OTP_VERIFIED || time() > $row['reset_expires']) {
+        bad('Verify your OTP before resetting your password', 403);
+    }
 
     $hashed = password_hash($password, PASSWORD_DEFAULT);
     $stmt = $pdo->prepare('UPDATE users SET password = ?, reset_otp = NULL, reset_expires = 0 WHERE id = ?');
-    $stmt->execute([$hashed, $userId]);
+    $stmt->execute([$hashed, $row['id']]);
     respond(good(['message' => 'Password reset successful! Please log in.']));
 }
 
@@ -288,6 +297,9 @@ function handle_verifyRegisterOTP($pdo) {
     if (time() - $row['dateCreated'] > 600) bad('OTP has expired. Please request a new one.', 400);
     if ($otp !== $row['otp']) bad('Incorrect OTP', 400);
 
+    // Mark verified so finishRegister can require it (valid 10 more minutes).
+    $stmt = $pdo->prepare('UPDATE pending_users SET otp = ?, dateCreated = ? WHERE email = ?');
+    $stmt->execute([OTP_VERIFIED, time(), $email]);
     respond(good(['message' => 'OTP verified! Set your password.']));
 }
 
@@ -307,6 +319,7 @@ function handle_finishRegister($pdo) {
     $stmt->execute([$email]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row || !$row['otp'] || time() - $row['dateCreated'] > 600) bad('Session expired. Please start over.', 400);
+    if ($row['otp'] !== OTP_VERIFIED) bad('Verify your OTP before creating your account', 403);
 
     $hashed = password_hash($password, PASSWORD_DEFAULT);
     $created_at = date('Y-m-d H:i:s');

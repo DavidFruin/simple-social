@@ -193,7 +193,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                     <div class="endpoint" id="verifyRegisterOTP">
                         <h3>verifyRegisterOTP</h3>
                         <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
-                        <p>Step 2 of registration. Checks the emailed code.</p>
+                        <p>Step 2 of registration. Checks the emailed code. After it succeeds, you have 10 minutes to call <code>finishRegister</code>.</p>
                         <table>
                             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
                             <tr><td><code>email</code></td><td>yes</td><td>Email being registered</td></tr>
@@ -212,7 +212,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                     <div class="endpoint" id="finishRegister">
                         <h3>finishRegister</h3>
                         <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
-                        <p>Step 3 of registration. Call after <code>verifyRegisterOTP</code> succeeds, within 10 minutes of requesting the code. Afterwards, call <code>login</code>.</p>
+                        <p>Step 3 of registration. Call within 10 minutes after <code>verifyRegisterOTP</code> succeeds. Afterwards, call <code>login</code>.</p>
                         <table>
                             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
                             <tr><td><code>email</code></td><td>yes</td><td>Email being registered</td></tr>
@@ -229,6 +229,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                             <tr><td>400</td><td>Password must contain a number</td></tr>
                             <tr><td>400</td><td>Password must contain a symbol</td></tr>
                             <tr><td>400</td><td>Session expired. Please start over.</td></tr>
+                            <tr><td>403</td><td>Verify your OTP before creating your account</td></tr>
                         </table>
                     </div>
 
@@ -252,7 +253,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                     <div class="endpoint" id="verifyOTP">
                         <h3>verifyOTP</h3>
                         <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
-                        <p>Step 2 of a password reset. Checks the emailed code. A code can only be verified once.</p>
+                        <p>Step 2 of a password reset. Checks the emailed code. After it succeeds, you have 10 minutes to call <code>resetPassword</code>.</p>
                         <table>
                             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
                             <tr><td><code>email</code></td><td>yes</td><td>Account email</td></tr>
@@ -270,7 +271,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                     <div class="endpoint" id="resetPassword">
                         <h3>resetPassword</h3>
                         <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
-                        <p>Step 3 of a password reset. Call after <code>verifyOTP</code> succeeds.</p>
+                        <p>Step 3 of a password reset. Call within 10 minutes after <code>verifyOTP</code> succeeds. Each verification allows one reset.</p>
                         <table>
                             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
                             <tr><td><code>email</code></td><td>yes</td><td>Account email</td></tr>
@@ -281,6 +282,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                         <table>
                             <tr><th>Status</th><th>message</th></tr>
                             <tr><td>400</td><td>Passwords do not match or are empty</td></tr>
+                            <tr><td>403</td><td>Verify your OTP before resetting your password</td></tr>
                             <tr><td>404</td><td>User not found</td></tr>
                         </table>
                     </div>
