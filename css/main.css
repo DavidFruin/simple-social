@@ -1118,13 +1118,15 @@ footer {
   box-shadow: var(--shadow-sm);
 }
 
-/* The "flag": hangs off the dot's left edge and tucks its square end behind
-   the dot (which paints over it, both being --color-primary) so the two read
-   as one piece -- a banner on a flagpole ball. */
+/* The "flag": hangs off the dot's left edge and overlaps it slightly so the
+   two read as one piece -- a banner on a flagpole ball. It sits above the dot
+   so the end of the word can't disappear behind it; both being
+   --color-primary, the overlap is invisible either way. */
 .thumb-nav-label {
   position: absolute;
   top: -13px;
   right: -8px;
+  z-index: 1;
   height: 26px;
   line-height: 26px;
   background: var(--color-primary);
