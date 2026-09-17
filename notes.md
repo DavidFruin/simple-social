@@ -19,6 +19,11 @@ add notifications badge to pwa
 
 BUGS
 while media lighthouse open page can still scroll
+resetPassword api action doesn't check the OTP so anyone who knows an email can change that account's password (security)
+finishRegister api action doesn't check the OTP so someone can register an email they don't own (security)
+log api action always returns 401 so front end errors never get logged on the server
+profile page adds a document click listener every visit that never gets removed so they pile up
+api-documentation.md is out of date now that api.html exists
 
 STYLE ERRORS
 truncated posts only show "..." as a hint that there's more text, easy to miss that you need to expand the post to read the rest
