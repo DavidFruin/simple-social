@@ -1081,6 +1081,18 @@ footer {
   transform: translateY(-5px) rotate(-45deg);
 }
 
+/* Sits on the closed bubble, since that's the only part of this menu visible
+   most of the time. Above the toggle's own z-index, and click-through so it
+   can't eat a tap meant for the button underneath. */
+.thumb-nav-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  z-index: 3;
+  border: 2px solid var(--color-bg);
+  pointer-events: none;
+}
+
 .thumb-nav-items {
   position: absolute;
   bottom: 0;

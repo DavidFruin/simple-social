@@ -19,7 +19,7 @@ function renderHeader() {
           <a href="/app.html#/search">Search</a>
           <a href="/app.html#/notifications">
             Notifications
-            <span id="notif-badge" class="badge hidden"></span>
+            <span class="badge notif-badge hidden"></span>
           </a>
           <a href="/app.html#/profile">Profile</a>
           <a href="/app.html#/settings">Settings</a>
@@ -28,10 +28,6 @@ function renderHeader() {
       </div>
     `;
     document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
-    // Just reflects whatever count Store already has -- actually fetching it
-    // is startNotificationCheck()'s job (called once on load, then every
-    // 60s), not something to redo on every re-render of this header.
-    updateNotificationBadge();
   } else {
     header.innerHTML = `
       <div class="header-content">
@@ -49,6 +45,11 @@ function renderHeader() {
   }
 
   renderThumbNav();
+  // After both, since each one draws its own badge. Only reflects whatever
+  // count Store already has -- actually fetching it is startNotificationCheck()'s
+  // job (called once on load, then every 60s), not something to redo on
+  // every re-render of this header.
+  updateNotificationBadge();
 }
 
 // Bottom-right corner bubble menu -- only shown on real touch devices (see
@@ -106,6 +107,7 @@ function renderThumbNav() {
     <button type="button" id="thumb-nav-toggle" class="thumb-nav-toggle" aria-label="Menu" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
+    <span class="badge notif-badge thumb-nav-badge hidden"></span>
     <div class="thumb-nav-items">${itemsHtml}</div>
   `;
 
@@ -135,17 +137,16 @@ function renderThumbNav() {
   }
 }
 
+// Updates every badge on the page: the header nav's, and the one on the
+// thumb bubble that stands in for it on touch devices, where the header nav
+// is hidden.
 function updateNotificationBadge() {
-  const badge = document.getElementById('notif-badge');
-  if (!badge) return;
-
   const count = Store.getNotificationCount();
-  if (count > 0) {
+
+  document.querySelectorAll('.notif-badge').forEach(badge => {
     badge.textContent = count > 99 ? '99+' : count;
-    badge.classList.remove('hidden');
-  } else {
-    badge.classList.add('hidden');
-  }
+    badge.classList.toggle('hidden', count === 0);
+  });
 }
 
 async function handleLogout(e) {
