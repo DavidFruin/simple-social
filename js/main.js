@@ -18,13 +18,12 @@ function init() {
   }
 
   Store.subscribe((state, changed) => {
-    // Store.clear() notifies with no `changed`; drop page caches on any
-    // account change so one user never sees another user's cached feed.
+    // Store.clear() (logout) notifies with no `changed`, so handle it with
+    // login changes: drop page caches so one user never sees another user's
+    // cached feed, and refresh the header.
     if (changed === 'jwt' || changed === 'user' || changed === undefined) {
       FeedPage.clearCache();
       ProfilePage.clearCache();
-    }
-    if (changed === 'jwt' || changed === 'user') {
       updateHeaderState();
       if (!Store.isLoggedIn()) {
         stopNotificationCheck();
@@ -55,6 +54,9 @@ function renderHeader() {
 function updateHeaderState() {
   const nav = document.getElementById('main-nav');
   if (!nav) return;
+
+  const logo = document.querySelector('#header .logo');
+  if (logo) logo.href = Store.isLoggedIn() ? '#/feed' : '/';
 
   if (Store.isLoggedIn()) {
     nav.innerHTML = `
