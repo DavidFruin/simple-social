@@ -1097,6 +1097,13 @@ footer {
   visibility: visible;
 }
 
+/* Keep the page behind the viewer from scrolling. */
+html.media-viewer-open,
+html.media-viewer-open body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .media-viewer-content {
   max-width: 90%;
   max-height: 90%;

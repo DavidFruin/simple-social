@@ -24,6 +24,10 @@ const MediaViewer = {
         this.close();
       }
     });
+
+    // Navigating away (e.g. back button) shouldn't leave the viewer open and
+    // the page stuck unscrollable.
+    window.addEventListener('hashchange', () => this.close());
   },
 
   open(url, type) {
@@ -40,6 +44,7 @@ const MediaViewer = {
     }
 
     this.overlay.classList.add('active');
+    document.documentElement.classList.add('media-viewer-open');
   },
 
   close() {
@@ -48,6 +53,7 @@ const MediaViewer = {
     const content = this.overlay.querySelector('.media-viewer-content');
     content.innerHTML = '';
     this.overlay.classList.remove('active');
+    document.documentElement.classList.remove('media-viewer-open');
   },
 
   toggleFullscreen() {
