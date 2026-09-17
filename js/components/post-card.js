@@ -29,9 +29,9 @@ function createPostCard(post, options = {}) {
       ${mediaHtml}
       <div class="post-footer">
         <div class="like-section">
-          <button class="btn-like ${isLiked ? 'liked' : ''}" data-post-id="${post.id}">
+          ${isOwner ? '' : `<button class="btn-like ${isLiked ? 'liked' : ''}" data-post-id="${post.id}">
             ${isLiked ? '♥' : '♡'}
-          </button>
+          </button>`}
           ${showLikeDropdown ? `<button class="btn-like-count" data-post-id="${post.id}">(${likeCount}) likes</button>
           <div class="like-dropdown hidden" data-post-id="${post.id}"></div>` : `<span>${likeCount}</span>`}
         </div>
