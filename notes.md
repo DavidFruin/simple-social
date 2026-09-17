@@ -22,7 +22,6 @@ BUGS
 the landing page should be the first page people land on, but .php takes precedence over .html on the server. talk this through with Claude later
 
 STYLE ERRORS
-images are displayed landscape regardless of the angle they were captured at. check the orientation when an image is captured or uploaded, and add a rotate button on the post page to rotate images before posting
 truncated posts only show "..." as a hint that there's more text, easy to miss that you need to expand the post to read the rest
 make date commented line up on comments of posts on expanded post view
 make newest commments on the bottom not the top of the comments
