@@ -50,6 +50,13 @@ const MediaViewer = {
   close() {
     if (!this.overlay) return;
 
+    // Closing while still fullscreen (e.g. pressed fullscreen, then the x)
+    // left the browser fullscreened on this now-empty, invisible overlay --
+    // which looks exactly like a frozen screen.
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+    }
+
     const content = this.overlay.querySelector('.media-viewer-content');
     content.innerHTML = '';
     this.overlay.classList.remove('active');
