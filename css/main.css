@@ -1625,12 +1625,7 @@ html.media-viewer-open body {
   margin: var(--spacing-md) 0 var(--spacing-lg);
 }
 
-.static-card-inset ol {
+.static-card-inset ol,
+.static-card-inset ul {
   margin-bottom: 0;
-}
-
-.install-status {
-  color: var(--color-success);
-  font-weight: 500;
-  margin: var(--spacing-sm) 0 0;
 }

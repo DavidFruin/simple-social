@@ -34,21 +34,14 @@
                     <h2>Install the app</h2>
                     <p>Add Simple Social to your home screen. It opens full-screen, without the browser's address bar, just like an app from the app store.</p>
 
-                    <div id="install-section">
-                        <button id="install-btn" class="btn btn-primary hidden">Install App</button>
-                        <p id="install-status" class="install-status hidden"></p>
-                        <div id="ios-instructions" class="static-card-inset hidden">
-                            <p>To add Simple Social to your Home Screen on iPhone or iPad:</p>
-                            <ol>
-                                <li>Open this page in <strong>Safari</strong> (this doesn't work in Chrome or other browsers on iOS).</li>
-                                <li>Tap the <strong>Share</strong> icon in the toolbar.</li>
-                                <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
-                                <li>Tap <strong>Add</strong> in the top right.</li>
-                            </ol>
-                        </div>
-                        <div id="manual-instructions" class="static-card-inset hidden">
-                            <p>Look in your browser's menu (usually the &#8942; or &#9776; icon) for an option called <strong>Install App</strong> or <strong>Add to Home Screen</strong>.</p>
-                        </div>
+                    <button id="install-btn" class="btn btn-primary">Install App</button>
+
+                    <div class="static-card-inset">
+                        <p>If the button doesn't do anything, install it manually instead:</p>
+                        <ul>
+                            <li><strong>Android, Chrome, Edge:</strong> open the browser's menu (usually &#8942; or &#9776;) and tap <strong>Install app</strong> or <strong>Add to Home Screen</strong>.</li>
+                            <li><strong>iPhone or iPad (Safari):</strong> tap the <strong>Share</strong> icon, then <strong>Add to Home Screen</strong>.</li>
+                        </ul>
                     </div>
 
                     <h2>iOS app</h2>
@@ -72,7 +65,6 @@
             <p>&copy; 2026 Simple Social</p>
         </footer>
     </div>
-    <script src="/js/pwa.js"></script>
     <script src="/js/install-button.js"></script>
 </body>
 </html>
