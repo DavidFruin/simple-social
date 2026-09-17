@@ -38,6 +38,10 @@
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
+    // The event can fire after the "can't install" fallback already showed
+    // (Chrome doesn't always fire it right away), so swap back to the
+    // button instead of leaving both visible.
+    manualInstructions.classList.add('hidden');
     installBtn.classList.remove('hidden');
   });
 
@@ -58,11 +62,12 @@
     showStatus('Installed! Look for Simple Social on your home screen.');
   });
 
-  // If the browser never offers an install prompt, it doesn't support this --
-  // fall back to pointing the user at its menu instead of showing nothing.
+  // Chrome doesn't always fire beforeinstallprompt right away -- give it a
+  // real chance before assuming this browser/visit won't offer it, rather
+  // than showing nothing while we wait.
   setTimeout(() => {
     if (!deferredPrompt && installBtn.classList.contains('hidden')) {
       manualInstructions.classList.remove('hidden');
     }
-  }, 1500);
+  }, 4000);
 })();
