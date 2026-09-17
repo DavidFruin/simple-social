@@ -92,20 +92,37 @@ function escapeHtml(unsafe) {
     .replace(/'/g, '&#39;');
 }
 
-function formatTimestamp(timestamp) {
-  if (!timestamp || timestamp === 'Unknown') return '';
-  
-  const date = new Date(timestamp.replace(' ', 'T'));
-  if (isNaN(date.getTime())) return '';
-  const now = new Date();
-  const diff = (now - date) / 1000;
+const NO_DATE_PLACEHOLDER = '0000-00-00 00:00:00';
 
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
-  
-  return date.toLocaleDateString();
+function formatTimestamp(timestamp) {
+  // Missing, "Unknown" (legacy follows predating timestamp tracking), or
+  // unparseable -- no real date to show anywhere in the app, so use an
+  // all-zero placeholder that's clearly not a real date but still reads as
+  // "long ago" rather than leaving a blank, confusing gap.
+  if (!timestamp || timestamp === 'Unknown') return NO_DATE_PLACEHOLDER;
+
+  const date = new Date(timestamp.replace(' ', 'T'));
+  if (isNaN(date.getTime())) return NO_DATE_PLACEHOLDER;
+
+  if (!Config.showRelativeTimeLabel) return timestamp;
+
+  const now = new Date();
+  const diffSeconds = (now - date) / 1000;
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - 6);
+
+  let label = null;
+  if (diffSeconds < 60) {
+    label = 'just now';
+  } else if (date >= startOfToday) {
+    label = 'today';
+  } else if (date >= startOfWeek) {
+    label = 'this week';
+  }
+
+  return label ? `${timestamp} (${label})` : timestamp;
 }
 
 // Delegated media-viewer handling. Replaces inline onclick= attributes so the
