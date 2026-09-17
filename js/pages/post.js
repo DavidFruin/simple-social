@@ -243,7 +243,7 @@ const PostPage = {
             const email = emails[like.userId] || 'User';
             return `
               <a href="#/profile/${like.userId}" class="like-dropdown-item">
-                <span class="like-user-email">${escapeHtml(email)}</span>
+                <span class="like-user-email">${displayEmail(email)}</span>
                 <span class="like-user-time">${formatTimestamp(like.timestamp)}</span>
               </a>
             `;

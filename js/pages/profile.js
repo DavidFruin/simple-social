@@ -177,7 +177,7 @@ const ProfilePage = {
 
     header.innerHTML = `
       <div class="profile-info">
-        <h1>${escapeHtml(this.user.email || 'User')}</h1>
+        <h1>${displayEmail(this.user.email || 'User')}</h1>
         <p class="profile-date">Joined ${this.user.created_at ? new Date(this.user.created_at).toLocaleDateString() : 'Unknown'}</p>
         <div class="profile-stats">
           <button class="btn-stat" id="btn-followers">
@@ -372,7 +372,7 @@ container.innerHTML = this.posts.map(post => {
             const email = emails[like.userId] || 'User';
             return `
               <a href="#/profile/${like.userId}" class="like-dropdown-item">
-                <span class="like-user-email">${escapeHtml(email)}</span>
+                <span class="like-user-email">${displayEmail(email)}</span>
                 <span class="like-user-time">${formatTimestamp(like.timestamp)}</span>
               </a>
             `;
@@ -435,7 +435,7 @@ container.innerHTML = this.posts.map(post => {
         } else {
           dropdown.innerHTML = followers.map(f => `
             <a href="#/profile/${f.id}" class="user-dropdown-item">
-              <span class="user-email">${escapeHtml(f.email)}</span>
+              <span class="user-email">${displayEmail(f.email)}</span>
               <span class="user-time">${formatTimestamp(f.timestamp)}</span>
             </a>
           `).join('');
@@ -466,7 +466,7 @@ container.innerHTML = this.posts.map(post => {
         } else {
           dropdown.innerHTML = following.map(f => `
             <a href="#/profile/${f.id}" class="user-dropdown-item">
-              <span class="user-email">${escapeHtml(f.email)}</span>
+              <span class="user-email">${displayEmail(f.email)}</span>
               <span class="user-time">${formatTimestamp(f.timestamp)}</span>
             </a>
           `).join('');

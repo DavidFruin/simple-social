@@ -89,7 +89,7 @@ const SearchPage = {
 
     dropdown.innerHTML = this.filteredUsers.slice(0, 5).map(user => {
       const userId = user.id || user.userId;
-      return `<a href="#/profile/${userId}" class="search-dropdown-item">${escapeHtml(user.email)}</a>`;
+      return `<a href="#/profile/${userId}" class="search-dropdown-item">${displayEmail(user.email)}</a>`;
     }).join('');
 
     dropdown.classList.remove('hidden');
@@ -128,7 +128,7 @@ const SearchPage = {
       return `
         <div class="user-result" data-user-id="${userId}">
           <div class="user-info">
-            <a href="#/profile/${userId}" class="user-email">${escapeHtml(user.email)}</a>
+            <a href="#/profile/${userId}" class="user-email">${displayEmail(user.email)}</a>
             <span class="user-date">Joined ${user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}</span>
           </div>
           ${isOwn ? '<span class="you-label">You</span>' : `

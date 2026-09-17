@@ -174,7 +174,7 @@ const NotificationsPage = {
   },
 
   getNotificationText(notification) {
-    const actor = escapeHtml(notification.actor_email || 'Someone');
+    const actor = displayEmail(notification.actor_email || 'Someone');
     switch (notification.type) {
       case 'follow': return `${actor} followed you`;
       case 'unfollow': return `${actor} unfollowed you`;

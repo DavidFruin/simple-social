@@ -21,7 +21,7 @@ function createPostCard(post, options = {}) {
   return `
     <div class="post-card" data-post-id="${post.id}">
       <div class="post-header">
-        <a href="#/profile/${post.userID || post.userId || ''}" class="post-user">${escapeHtml(post.userEmail || 'User')}</a>
+        <a href="#/profile/${post.userID || post.userId || ''}" class="post-user">${displayEmail(post.userEmail || 'User')}</a>
         <span class="post-time">${formatTimestamp(post.timestamp)}</span>
         ${isOwner ? `<button class="btn-delete-post" data-post-id="${post.id}">Delete</button>` : ''}
       </div>
@@ -92,6 +92,13 @@ function escapeHtml(unsafe) {
     .replace(/'/g, '&#39;');
 }
 
+// Escaped email for display, prefixed with "(you)" when it's the logged-in user's.
+function displayEmail(email) {
+  const current = Store.getUser()?.email;
+  const isYou = email && current && email.toLowerCase() === current.toLowerCase();
+  return (isYou ? '(you) ' : '') + escapeHtml(email);
+}
+
 const NO_DATE_PLACEHOLDER = '0000-00-00 00:00:00';
 
 function formatTimestamp(timestamp) {
@@ -145,5 +152,6 @@ if (!window.__mediaViewerDelegated) {
 
 window.createPostCard = createPostCard;
 window.escapeHtml = escapeHtml;
+window.displayEmail = displayEmail;
 window.formatTimestamp = formatTimestamp;
 window.createMediaHtml = createMediaHtml;
