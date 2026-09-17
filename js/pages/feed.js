@@ -200,8 +200,8 @@ const FeedPage = {
         if (!this.isActive) return;
         post.likes = [...(post.likes || []), { userId: user?.id, timestamp: new Date().toISOString() }];
       }
-      
-      this.renderPosts();
+
+      updatePostLikeUI(postId, !isLiked, post.likes.length);
     } catch (err) {
       showError(err.message);
     }

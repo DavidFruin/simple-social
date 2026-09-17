@@ -179,6 +179,30 @@ if (!window.__mediaViewerDelegated) {
 
 window.createPostCard = createPostCard;
 window.initPostTruncation = initPostTruncation;
+
+// Updates a post card's like button/count in place after a successful
+// like/unlike, instead of re-rendering the whole list -- which caused a
+// visible flash as every other post's images/videos reloaded too.
+function updatePostLikeUI(postId, isLiked, likeCount) {
+  const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+  if (!card) return;
+
+  const likeBtn = card.querySelector('.btn-like');
+  if (likeBtn) {
+    likeBtn.classList.toggle('liked', isLiked);
+    likeBtn.textContent = isLiked ? '♥' : '♡';
+  }
+
+  const countBtn = card.querySelector('.btn-like-count');
+  if (countBtn) {
+    countBtn.textContent = `(${likeCount}) likes`;
+  } else {
+    const countSpan = card.querySelector('.like-section > span');
+    if (countSpan) countSpan.textContent = likeCount;
+  }
+}
+
+window.updatePostLikeUI = updatePostLikeUI;
 window.escapeHtml = escapeHtml;
 window.displayEmail = displayEmail;
 window.formatTimestamp = formatTimestamp;

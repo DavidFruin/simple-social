@@ -326,8 +326,8 @@ container.innerHTML = this.posts.map(post => {
         if (!this.isActive) return;
         post.likes = [...(post.likes || []), { userId: user?.id }];
       }
-      
-      this.renderPosts();
+
+      updatePostLikeUI(postId, !isLiked, post.likes.length);
     } catch (err) {
       showError(err.message);
     }

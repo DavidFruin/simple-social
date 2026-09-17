@@ -25,7 +25,6 @@ STYLE FEATURES
 dark mode and a color mode: blue theme, red theme, and a hacker theme (green-on-black terminal look). settable in Settings, same place as the existing dark mode / light mode / left-hand / right-hand options.
 
 BUGS
-once logged in there's no way to reach the about, api, code of conduct, or download pages -- they're only linked from the landing page menu, which a logged-in user never sees
 liking and unliking a post causes weird flashing
 
 STYLE ERRORS
