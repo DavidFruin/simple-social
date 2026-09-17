@@ -20,7 +20,6 @@ media capture should be three buttons: picture, video, audio
 
 BUGS
 the landing page should be the first page people land on, but .php takes precedence over .html on the server. talk this through with Claude later
-video capture has audio feedback, it shouldn't play any sound while recording video
 
 STYLE ERRORS
 images are displayed landscape regardless of the angle they were captured at. check the orientation when an image is captured or uploaded, and add a rotate button on the post page to rotate images before posting
