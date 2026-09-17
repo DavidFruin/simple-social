@@ -58,6 +58,28 @@ body {
   --color-border: #374151;
 }
 
+:root[data-theme="red"] {
+  --color-primary: #b8655f;
+  --color-primary-hover: #a1554f;
+  --color-secondary: #a1554f;
+  --color-bg: #fdf6f5;
+  --color-bg-secondary: #faf0ee;
+  --color-text: #4a3130;
+  --color-text-secondary: #8a6461;
+  --color-border: #e8d5d3;
+}
+
+:root[data-theme="blue"] {
+  --color-primary: #3ba9e0;
+  --color-primary-hover: #2f92c4;
+  --color-secondary: #2f92c4;
+  --color-bg: #f7fcff;
+  --color-bg-secondary: #eaf6fd;
+  --color-text: #234a63;
+  --color-text-secondary: #5c85a0;
+  --color-border: #cdeaf7;
+}
+
 /* ============== LAYOUT ============== */
 #app {
   min-height: 100vh;

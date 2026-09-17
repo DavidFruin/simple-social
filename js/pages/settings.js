@@ -12,6 +12,8 @@ const SettingsPage = {
             <select class="form-input" id="theme-select">
               <option value="light">Light</option>
               <option value="dark">Dark</option>
+              <option value="red">Red</option>
+              <option value="blue">Blue</option>
             </select>
           </div>
         </div>
