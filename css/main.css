@@ -311,7 +311,20 @@ footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-sm);
+}
+
+.post-user,
+.comment-user,
+.like-user-email,
+.user-email,
+.search-dropdown-item,
+.notification-actor {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .post-user {
@@ -324,6 +337,16 @@ footer {
   text-decoration: underline;
 }
 
+.post-time,
+.btn-delete-post,
+.comment-time,
+.btn-delete-comment,
+.like-user-time,
+.user-dropdown-item .user-time,
+.notification-time {
+  flex-shrink: 0;
+}
+
 .post-time {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
@@ -333,6 +356,16 @@ footer {
   margin-bottom: var(--spacing-md);
   line-height: 1.6;
   word-wrap: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+
+#post-container .post-body {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 .post-footer {
@@ -394,6 +427,7 @@ footer {
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-md);
   min-width: 200px;
+  max-width: 320px;
   max-height: 200px;
   overflow-y: auto;
   z-index: 10;
@@ -402,6 +436,7 @@ footer {
 .like-dropdown-item {
   display: flex;
   justify-content: space-between;
+  gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid var(--color-border);
   text-decoration: none;
@@ -438,6 +473,7 @@ footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-xs);
 }
 
@@ -498,6 +534,7 @@ footer {
   text-decoration: none;
   color: var(--color-text);
   flex: 1;
+  min-width: 0;
 }
 
 .notification-icon {
@@ -533,13 +570,20 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+}
+
+.notification-actor {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
 }
 
 .notification-post-preview {
   font-size: 0.8rem;
   color: var(--color-text-secondary);
   font-style: italic;
-  max-width: 300px;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -580,7 +624,6 @@ footer {
   font-weight: 500;
   color: var(--color-text);
   text-decoration: none;
-  word-break: break-all;
 }
 
 .user-email:hover {
@@ -693,6 +736,7 @@ footer {
 .user-dropdown-item {
   display: flex;
   justify-content: space-between;
+  gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid var(--color-border);
   text-decoration: none;
