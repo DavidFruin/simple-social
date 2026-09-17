@@ -47,6 +47,85 @@ function renderHeader() {
       </div>
     `;
   }
+
+  renderThumbNav();
+}
+
+// Bottom-right corner bubble menu -- only shown on real touch devices (see
+// the (hover: none) and (pointer: coarse) media query in main.css), never on
+// a shrunk desktop browser window. Fans the same nav items out along a
+// quarter-circle arc above/left of the corner, since that's the only
+// direction guaranteed to stay on-screen from a bottom-right anchor.
+function renderThumbNav() {
+  let container = document.getElementById('thumb-nav');
+
+  if (!Store.isLoggedIn()) {
+    container?.remove();
+    return;
+  }
+
+  const items = [
+    { href: '/app.html#/feed', label: 'Feed' },
+    { href: '/app.html#/create-post', label: 'Post' },
+    { href: '/app.html#/search', label: 'Search' },
+    { href: '/app.html#/notifications', label: 'Notifications' },
+    { href: '/app.html#/profile', label: 'Profile' },
+    { href: '/app.html#/settings', label: 'Settings' },
+    { href: '#', label: 'Logout', logout: true }
+  ];
+  const radius = 150;
+  const angleStep = 90 / (items.length - 1);
+
+  const itemsHtml = items.map((item, i) => {
+    const rad = (angleStep * i) * Math.PI / 180;
+    const tx = (-radius * Math.sin(rad)).toFixed(1);
+    const ty = (-radius * Math.cos(rad)).toFixed(1);
+    return `
+      <a href="${item.href}" class="thumb-nav-item" style="--tx: ${tx}px; --ty: ${ty}px; transition-delay: ${i * 25}ms;"${item.logout ? ' data-logout="true"' : ''}>
+        <span class="thumb-nav-label">${item.label}</span>
+        <span class="thumb-nav-dot"></span>
+      </a>
+    `;
+  }).join('');
+
+  const isNew = !container;
+  if (isNew) {
+    container = document.createElement('div');
+    container.id = 'thumb-nav';
+    document.body.appendChild(container);
+  }
+
+  container.innerHTML = `
+    <button type="button" id="thumb-nav-toggle" class="thumb-nav-toggle" aria-label="Menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="thumb-nav-items">${itemsHtml}</div>
+  `;
+
+  // Delegated on the container (which persists across re-renders) rather
+  // than on the toggle/items directly, since those get replaced every time
+  // renderThumbNav() runs -- a direct listener would need re-attaching (and
+  // would leak) on every nav-triggered header re-render.
+  if (isNew) {
+    container.addEventListener('click', (e) => {
+      const toggle = e.target.closest('#thumb-nav-toggle');
+      if (toggle) {
+        const open = container.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        return;
+      }
+
+      const item = e.target.closest('.thumb-nav-item');
+      if (item) {
+        container.classList.remove('open');
+        document.getElementById('thumb-nav-toggle')?.setAttribute('aria-expanded', 'false');
+        if (item.dataset.logout) {
+          e.preventDefault();
+          handleLogout(e);
+        }
+      }
+    });
+  }
 }
 
 function updateNotificationBadge() {

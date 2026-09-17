@@ -1019,6 +1019,116 @@ footer {
   color: var(--color-error);
 }
 
+/* ============== THUMB NAV ============== */
+/* Bottom-right corner bubble menu. (hover: none) + (pointer: coarse) targets
+   actual touchscreens, not a desktop browser window that's just been made
+   narrow -- a shrunk mouse-driven window still reports pointer: fine. */
+#thumb-nav {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  right: 20px;
+  z-index: 500;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  #thumb-nav {
+    display: block;
+  }
+}
+
+.thumb-nav-toggle {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.thumb-nav-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: white;
+  margin: 3px 0;
+  transition: transform 0.25s, opacity 0.25s;
+}
+
+#thumb-nav.open .thumb-nav-toggle span:nth-child(1) {
+  transform: translateY(5px) rotate(45deg);
+}
+
+#thumb-nav.open .thumb-nav-toggle span:nth-child(2) {
+  opacity: 0;
+}
+
+#thumb-nav.open .thumb-nav-toggle span:nth-child(3) {
+  transform: translateY(-5px) rotate(-45deg);
+}
+
+.thumb-nav-items {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 56px;
+  height: 56px;
+}
+
+/* Each item starts collapsed at the toggle's own center (top/left: 50% of
+   the 56px box, offset back by its own half-size), then on open translates
+   out to (--tx, --ty) -- the point on the arc computed in header.js. */
+.thumb-nav-item {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+  text-decoration: none;
+}
+
+#thumb-nav.open .thumb-nav-item {
+  transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.thumb-nav-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  order: 2;
+}
+
+/* The "flag" -- attached flush to the dot (its flagpole ball) and always
+   streaming toward the left, away from the corner, rather than rotated to
+   match each item's own angle, so the text stays level and readable. */
+.thumb-nav-label {
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 6px 14px 6px 12px;
+  border-radius: 999px 0 0 999px;
+  margin-right: -14px;
+  order: 1;
+}
+
 /* ============== RESPONSIVE ============== */
 @media (max-width: 768px) {
   #main {
