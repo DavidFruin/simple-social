@@ -84,6 +84,11 @@ const Router = {
     container.innerHTML = '';
     this.currentPage = null;
 
+    // A new page starts at the top; otherwise it inherits the previous
+    // page's scroll offset and its top is hidden under the sticky header.
+    // Back/forward leaves scrolling to the page so it can restore position.
+    if (!route.restore) window.scrollTo(0, 0);
+
     switch (route.page) {
       case 'login':
         if (typeof LoginPage !== 'undefined') {
