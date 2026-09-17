@@ -6,6 +6,17 @@ const SettingsPage = {
         <h1>Account Settings</h1>
 
         <div class="settings-section">
+          <h2>Appearance</h2>
+          <div class="form-group">
+            <label for="theme-select">Theme</label>
+            <select class="form-input" id="theme-select">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-section">
           <h2>Info</h2>
           <ul class="settings-links">
             <li><a href="/about.html">About</a></li>
@@ -31,6 +42,26 @@ const SettingsPage = {
     `;
 
     document.getElementById('delete-form')?.addEventListener('submit', this.handleDeleteSubmit.bind(this));
+
+    const themeSelect = document.getElementById('theme-select');
+    if (themeSelect) {
+      themeSelect.value = Store.getTheme();
+      themeSelect.addEventListener('change', this.handleThemeChange.bind(this));
+    }
+  },
+
+  async handleThemeChange(e) {
+    const theme = e.target.value;
+    const previousTheme = Store.getTheme();
+
+    try {
+      await api.updateTheme(theme);
+      Store.setUser({ ...Store.getUser(), theme });
+      showSuccess('Theme updated');
+    } catch (err) {
+      e.target.value = previousTheme;
+      showError(err.message);
+    }
   },
 
   async handleDeleteSubmit(e) {

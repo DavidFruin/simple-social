@@ -59,7 +59,8 @@ const LoginPage = {
           id: userInfo.id || userInfo.userId,
           userId: userInfo.id || userInfo.userId,
           email: userInfo.email,
-          created_at: userInfo.created_at
+          created_at: userInfo.created_at,
+          theme: userInfo.theme || 'light'
         });
         
         messageDiv.textContent = 'Login successful! Redirecting...';

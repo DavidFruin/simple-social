@@ -140,6 +140,10 @@ const API = {
     return this.call('deleteAccount', { password });
   },
 
+  async updateTheme(theme) {
+    return this.call('updateTheme', { theme });
+  },
+
   // ============== POSTS ==============
   async post(postText, mediaUrl = null) {
     return this.call('post', { postText, mediaUrl });

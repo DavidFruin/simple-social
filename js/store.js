@@ -23,6 +23,7 @@ const Store = {
         this.state.user = null;
       }
     }
+    this.applyTheme();
     return this.state;
   },
 
@@ -49,11 +50,24 @@ const Store = {
     } else {
       localStorage.removeItem(this.USER_KEY);
     }
+    this.applyTheme();
     this.notify('user');
   },
 
   getUser() {
     return this.state.user;
+  },
+
+  getTheme() {
+    return this.state.user?.theme || 'light';
+  },
+
+  // Reflects the logged-in user's theme flag as a data-theme attribute on
+  // <html>, which css/main.css uses to swap the --color-* variables. Runs on
+  // every load and whenever the user object changes, so it applies before the
+  // page has a chance to flash the wrong colors.
+  applyTheme() {
+    document.documentElement.setAttribute('data-theme', this.getTheme());
   },
 
   setUserId(id) {
@@ -89,6 +103,7 @@ const Store = {
     localStorage.removeItem(this.JWT_KEY);
     localStorage.removeItem(this.USER_KEY);
     api.clearJwt();
+    this.applyTheme();
     this.notify();
   },
 

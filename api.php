@@ -88,6 +88,12 @@ function db() {
         foreach ($cols as $c) if ($c['name'] === 'post_id') $hasPostId = true;
         if (!$hasPostId) $pdo->exec('ALTER TABLE media ADD COLUMN post_id TEXT');
     } catch (Exception $e) {}
+    try {
+        $cols = $pdo->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC);
+        $hasTheme = false;
+        foreach ($cols as $c) if ($c['name'] === 'theme') $hasTheme = true;
+        if (!$hasTheme) $pdo->exec("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'light'");
+    } catch (Exception $e) {}
     return $pdo;
 }
 
@@ -729,10 +735,20 @@ function handle_getUserEmails($pdo, $user) {
 }
 
 function handle_getMyInfo($pdo, $user) {
-    $stmt = $pdo->prepare('SELECT id, email, created_at FROM users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, email, created_at, theme FROM users WHERE id = ?');
     $stmt->execute([$user['sub']]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    respond(good(['id' => $user['sub'], 'userId' => $user['sub'], 'email' => $row['email'] ?? 'User', 'created_at' => $row['created_at'] ?? 'Unknown']));
+    respond(good(['id' => $user['sub'], 'userId' => $user['sub'], 'email' => $row['email'] ?? 'User', 'created_at' => $row['created_at'] ?? 'Unknown', 'theme' => $row['theme'] ?: 'light']));
+}
+
+function handle_updateTheme($pdo, $user) {
+    $theme = $_POST['theme'] ?? '';
+    $allowedThemes = ['light', 'dark'];
+    if (!in_array($theme, $allowedThemes, true)) bad('Invalid theme', 400);
+
+    $stmt = $pdo->prepare('UPDATE users SET theme = ? WHERE id = ?');
+    $stmt->execute([$theme, $user['sub']]);
+    respond(good(['message' => 'Theme updated']));
 }
 
 function handle_fetchFollowedPosts($pdo, $user) {
@@ -1099,6 +1115,7 @@ $HANDLERS = [
     'deleteComment' => 'handle_deleteComment', 'getPostCommentCounts' => 'handle_getPostCommentCounts',
     'markNotificationsSeen' => 'handle_markNotificationsSeen', 'getPostById' => 'handle_getPostById',
     'getPostPreviews' => 'handle_getPostPreviews',
+    'updateTheme' => 'handle_updateTheme',
     'log' => 'handle_log_request'
 ];
 

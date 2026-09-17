@@ -25,7 +25,6 @@ STYLE FEATURES
 dark mode and a color mode: blue theme, red theme, and a hacker theme (green-on-black terminal look). settable in Settings, same place as the existing dark mode / light mode / left-hand / right-hand options.
 
 BUGS
-liking and unliking a post causes weird flashing
 
 STYLE ERRORS
 
