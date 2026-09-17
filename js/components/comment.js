@@ -16,7 +16,7 @@ function createCommentElement(comment, options = {}) {
     <div class="comment-header">
       <a href="#/profile/${comment.user_id}" class="comment-user">${escapeHtml(comment.user_email || 'User')}</a>
       <span class="comment-time">${formatTimestamp(comment.created_at)}</span>
-      ${isOwner && showDeleteButton ? '<button class="btn-delete-comment" data-comment-id="' + comment.id + '">×</button>' : ''}
+      ${isOwner && showDeleteButton ? '<button class="btn-delete-comment" data-comment-id="' + comment.id + '">Delete</button>' : ''}
     </div>
     <div class="comment-body">${escapeHtml(comment.text)}</div>
   `;
