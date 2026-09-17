@@ -1032,6 +1032,32 @@ footer {
   background: var(--color-error);
 }
 
+.media-rotate-btn {
+  position: absolute;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-rotate-btn:hover {
+  background: var(--color-primary);
+}
+
+.media-rotate-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 #media-status {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);

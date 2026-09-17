@@ -13,6 +13,10 @@ const CreatePostPage = {
   audioContext: null,
   analyser: null,
   animationFrame: null,
+  // Images keep the original file so rotating always starts from it and
+  // repeated rotations don't pile up re-encoding loss.
+  originalImage: null,
+  imageRotation: 0,
 
   render(container) {
     const draft = this.loadDraft();
@@ -112,26 +116,16 @@ const CreatePostPage = {
     const status = document.getElementById('media-status');
     const selectMediaBtn = document.getElementById('select-media-btn');
     
-    this.uploading = true;
     selectMediaBtn.disabled = true;
     status.textContent = 'Uploading...';
 
     try {
-      const result = await api.uploadMedia(file);
-      
-      // Replacing existing media: delete the previous upload so it isn't orphaned
-      const previousMediaId = this.currentMediaId;
-      if (previousMediaId && previousMediaId !== result.mediaId) {
-        api.deleteMedia(previousMediaId).catch(err => {
-          console.error('Failed to delete replaced media:', err.message);
-        });
-      }
-
-      this.currentMediaUrl = result.mediaUrl;
-      this.currentMediaType = result.type;
-      this.currentMediaId = result.mediaId;
-      
-      this.renderMediaPreview(result);
+      const isImage = file.type.startsWith('image/');
+      const upload = isImage ? await this.renderImageFile(file, 0) : file;
+      await this.uploadAndReplace(upload);
+      this.originalImage = isImage ? file : null;
+      this.imageRotation = 0;
+      this.renderMediaPreview({ mediaUrl: this.currentMediaUrl, type: this.currentMediaType });
       status.textContent = 'Uploaded!';
       selectMediaBtn.textContent = 'Change Media';
     } catch (err) {
@@ -139,8 +133,84 @@ const CreatePostPage = {
       status.textContent = 'Upload failed';
       this.clearMedia();
     } finally {
-      this.uploading = false;
       selectMediaBtn.disabled = false;
+    }
+  },
+
+  // Uploads a file and makes it the post's media, deleting the previous upload
+  // so it isn't orphaned.
+  async uploadAndReplace(file) {
+    this.uploading = true;
+    try {
+      const result = await api.uploadMedia(file);
+      const previousMediaId = this.currentMediaId;
+      if (previousMediaId && previousMediaId !== result.mediaId) {
+        api.deleteMedia(previousMediaId).catch(err => {
+          console.error('Failed to delete replaced media:', err.message);
+        });
+      }
+      this.currentMediaUrl = result.mediaUrl;
+      this.currentMediaType = result.type;
+      this.currentMediaId = result.mediaId;
+      this.renderMediaPreview(result);
+      return result;
+    } finally {
+      this.uploading = false;
+    }
+  },
+
+  // Redraws an image upright (browsers apply the photo's EXIF orientation when
+  // decoding it), rotated `rotation` degrees clockwise, with the longest side
+  // capped at 1920px to match the server.
+  async renderImageFile(source, rotation) {
+    const url = URL.createObjectURL(source);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+
+      const scale = Math.min(1, 1920 / Math.max(img.naturalWidth, img.naturalHeight));
+      const width = Math.round(img.naturalWidth * scale);
+      const height = Math.round(img.naturalHeight * scale);
+      const sideways = rotation % 180 !== 0;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = sideways ? height : width;
+      canvas.height = sideways ? width : height;
+      const ctx = canvas.getContext('2d');
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(rotation * Math.PI / 180);
+      ctx.drawImage(img, -width / 2, -height / 2, width, height);
+
+      // Formats that can be transparent stay PNG; photos become JPEG.
+      const keepsAlpha = ['image/png', 'image/gif', 'image/webp'].includes(source.type);
+      const type = keepsAlpha ? 'image/png' : 'image/jpeg';
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, type, 0.92));
+      if (!blob) throw new Error('Could not process image');
+      return new File([blob], keepsAlpha ? 'image.png' : 'image.jpg', { type });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  },
+
+  async rotateImage() {
+    if (!this.originalImage || this.uploading) return;
+
+    const status = document.getElementById('media-status');
+    const rotateBtn = document.querySelector('.media-rotate-btn');
+    if (rotateBtn) rotateBtn.disabled = true;
+    status.textContent = 'Rotating...';
+
+    const rotation = (this.imageRotation + 90) % 360;
+    try {
+      const file = await this.renderImageFile(this.originalImage, rotation);
+      await this.uploadAndReplace(file);
+      this.imageRotation = rotation;
+      status.textContent = '';
+    } catch (err) {
+      showError(err.message);
+      status.textContent = 'Rotate failed';
+      if (rotateBtn) rotateBtn.disabled = false;
     }
   },
 
@@ -155,6 +225,7 @@ const CreatePostPage = {
       preview.innerHTML = `
         <div class="media-preview-item">
           <img src="${url}" alt="Preview">
+          ${this.originalImage ? '<button type="button" class="media-rotate-btn" onclick="CreatePostPage.rotateImage()" title="Rotate" aria-label="Rotate image">⟳</button>' : ''}
           <button type="button" class="media-remove-btn" onclick="CreatePostPage.clearMedia()">×</button>
         </div>
       `;
@@ -269,20 +340,10 @@ const CreatePostPage = {
       status.textContent = 'Uploading...';
       selectMediaBtn.disabled = true;
 
-      const result = await api.uploadMedia(file);
-
-      // Replacing existing media: delete the previous upload so it isn't orphaned
-      const previousMediaId = this.currentMediaId;
-      if (previousMediaId && previousMediaId !== result.mediaId) {
-        api.deleteMedia(previousMediaId).catch(err => {
-          console.error('Failed to delete replaced media:', err.message);
-        });
-      }
-
-      this.currentMediaUrl = result.mediaUrl;
-      this.currentMediaType = result.type;
-      this.currentMediaId = result.mediaId;
-      this.renderMediaPreview(result);
+      await this.uploadAndReplace(file);
+      this.originalImage = file;
+      this.imageRotation = 0;
+      this.renderMediaPreview({ mediaUrl: this.currentMediaUrl, type: this.currentMediaType });
 
       this.closeCaptureModal();
       this.clearMediaInput();
@@ -561,20 +622,8 @@ const CreatePostPage = {
 
       status.textContent = `Uploading ${type}...`;
 
-      const result = await api.uploadMedia(file);
-
-      // Replacing existing media: delete the previous upload so it isn't orphaned
-      const previousMediaId = this.currentMediaId;
-      if (previousMediaId && previousMediaId !== result.mediaId) {
-        api.deleteMedia(previousMediaId).catch(err => {
-          console.error('Failed to delete replaced media:', err.message);
-        });
-      }
-
-      this.currentMediaUrl = result.mediaUrl;
-      this.currentMediaType = result.type;
-      this.currentMediaId = result.mediaId;
-      this.renderMediaPreview(result);
+      this.originalImage = null;
+      await this.uploadAndReplace(file);
 
       this.closeCaptureModal();
       this.clearMediaInput();
@@ -608,6 +657,8 @@ const CreatePostPage = {
     this.currentMediaUrl = null;
     this.currentMediaType = null;
     this.currentMediaId = null;
+    this.originalImage = null;
+    this.imageRotation = 0;
     this.stopCaptureStream();
     this.stopVisualizer();
     
@@ -627,6 +678,8 @@ const CreatePostPage = {
     this.currentMediaUrl = null;
     this.currentMediaType = null;
     this.currentMediaId = null;
+    this.originalImage = null;
+    this.imageRotation = 0;
     this.stopCaptureStream();
     this.stopVisualizer();
 
@@ -650,6 +703,11 @@ const CreatePostPage = {
 
     if (!text) {
       showError('Please enter some text');
+      return;
+    }
+
+    if (this.uploading) {
+      showError('Please wait for your media to finish uploading');
       return;
     }
 
