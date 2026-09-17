@@ -27,7 +27,6 @@ BUGS
 once logged in there's no way to reach the about, api, code of conduct, or download pages -- they're only linked from the landing page menu, which a logged-in user never sees
 liking and unliking a post causes weird flashing
 opening an image in the lightbox, pressing the fullscreen button, then closing the lightbox with the x leaves the screen frozen
-the landing page should be the first page people land on, but .php takes precedence over .html on the server. talk this through with Claude later
 
 STYLE ERRORS
 truncated posts only show "..." as a hint that there's more text, easy to miss that you need to expand the post to read the rest
