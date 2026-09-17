@@ -13,23 +13,32 @@ const ProfilePage = {
   limit: 25,
   hasMore: true,
   loading: false,
+  isFollowing: false,
+  scrollPosition: 0,
 
-  render(container, userId) {
+  render(container, userId, { restore = false } = {}) {
     this.isActive = true;
     const currentUser = Store.getUser();
-    this.isOwnProfile = !userId || userId === currentUser?.id || userId === currentUser?.userId;
-    this.userId = this.isOwnProfile ? currentUser?.id : userId;
+    const isOwnProfile = !userId || userId === currentUser?.id || userId === currentUser?.userId;
+    const targetUserId = isOwnProfile ? currentUser?.id : userId;
+
+    // Back/forward into the same profile with data already loaded: redraw from
+    // cache and restore scroll. Nav clicks and other profiles load fresh.
+    const isSameProfileCached = restore && this.userId === targetUserId && !!this.user;
+
+    this.isOwnProfile = isOwnProfile;
+    this.userId = targetUserId;
 
     container.innerHTML = `
       <div class="page-container">
         <div id="profile-header">
           <div class="loading">Loading profile...</div>
         </div>
-        
+
         <div id="profile-actions" class="hidden">
           ${this.isOwnProfile ? '' : '<button id="follow-btn" class="btn btn-primary">Follow</button>'}
         </div>
-        
+
         <h2>Posts</h2>
         <div id="posts-container"></div>
         <div id="loading-indicator" class="hidden">Loading...</div>
@@ -40,18 +49,36 @@ const ProfilePage = {
       </div>
     `;
 
-    this.offset = 0;
-    this.posts = [];
-    this.hasMore = true;
-
     this.loadMoreClickHandler = () => this.loadMorePosts();
     document.getElementById('load-more-btn')?.addEventListener('click', this.loadMoreClickHandler);
 
-    this.loadProfile();
+    if (isSameProfileCached) {
+      this.renderProfileHeader();
+      this.renderFollowButton(this.isFollowing);
+      this.renderPosts();
+      this.attachDropdownListeners();
+      window.scrollTo(0, this.scrollPosition);
+    } else {
+      this.clearCache();
+      this.userId = targetUserId;
+      this.loadProfile();
+    }
+  },
+
+  clearCache() {
+    this.user = null;
+    this.userId = null;
+    this.posts = [];
+    this.commentCounts = {};
+    this.offset = 0;
+    this.hasMore = true;
+    this.isFollowing = false;
+    this.scrollPosition = 0;
   },
 
   destroy() {
     this.isActive = false;
+    this.scrollPosition = window.scrollY;
     if (this.postsClickHandler && this.postsContainerEl) {
       this.postsContainerEl.removeEventListener('click', this.postsClickHandler);
       this.postsClickHandler = null;
@@ -98,12 +125,12 @@ const ProfilePage = {
         }
       }
       
-      const isFollowing = follows.follows?.some(f => 
+      this.isFollowing = follows.follows?.some(f =>
         (f.id || f.userId) == this.userId
       );
 
       this.renderProfileHeader();
-      this.renderFollowButton(isFollowing);
+      this.renderFollowButton(this.isFollowing);
       this.renderPosts();
       this.attachDropdownListeners();
     } catch (err) {
@@ -263,12 +290,14 @@ container.innerHTML = this.posts.map(post => {
         btn.textContent = 'Follow';
         btn.classList.remove('btn-secondary');
         btn.classList.add('btn-primary');
+        this.isFollowing = false;
       } else {
         await api.followUser(this.userId);
         btn.dataset.following = 'true';
         btn.textContent = 'Unfollow';
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-secondary');
+        this.isFollowing = true;
       }
     } catch (err) {
       showError(err.message);

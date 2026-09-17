@@ -9,8 +9,9 @@ const FeedPage = {
   postsClickHandler: null,
   postsContainerEl: null,
   loadMoreClickHandler: null,
+  scrollPosition: 0,
 
-  render(container) {
+  render(container, { restore = false } = {}) {
     this.isActive = true;
     container.innerHTML = `
       <div class="page-container">
@@ -30,7 +31,24 @@ const FeedPage = {
     `;
 
     this.attachEventListeners();
-    this.loadPosts();
+
+    // Back/forward into feed with posts already loaded: redraw from cache and
+    // restore scroll. Nav clicks and first visits load fresh.
+    if (restore && this.posts.length > 0) {
+      this.renderPosts();
+      window.scrollTo(0, this.scrollPosition);
+    } else {
+      this.scrollPosition = 0;
+      this.loadPosts();
+    }
+  },
+
+  clearCache() {
+    this.posts = [];
+    this.commentCounts = {};
+    this.offset = 0;
+    this.hasMore = true;
+    this.scrollPosition = 0;
   },
 
   attachEventListeners() {
@@ -40,6 +58,7 @@ const FeedPage = {
 
   destroy() {
     this.isActive = false;
+    this.scrollPosition = window.scrollY;
     if (this.postsClickHandler && this.postsContainerEl) {
       this.postsContainerEl.removeEventListener('click', this.postsClickHandler);
       this.postsClickHandler = null;

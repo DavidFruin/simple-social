@@ -16,13 +16,24 @@ const Router = {
     search: { path: '/search', requiresAuth: true }
   },
   currentPage: null,
+  // hashchange can't tell a link click from back/forward, so link clicks and
+  // navigate() flag the next change as fresh; anything unflagged came from
+  // history and lets pages restore their cached state.
+  pendingFresh: false,
 
   init() {
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a[href^="#/"]');
+      if (link && link.getAttribute('href') !== window.location.hash) {
+        this.pendingFresh = true;
+      }
+    }, true);
     window.addEventListener('hashchange', () => this.handleHashChange());
     this.handleHashChange();
   },
 
   navigate(path) {
+    if ('#' + path !== window.location.hash) this.pendingFresh = true;
     window.location.hash = path;
   },
 
@@ -37,7 +48,10 @@ const Router = {
   },
 
   handleHashChange() {
+    const restore = !this.pendingFresh;
+    this.pendingFresh = false;
     const route = this.getRoute();
+    route.restore = restore;
     const page = route.page;
     const routeConfig = this.routes[page];
 
@@ -91,7 +105,7 @@ const Router = {
         break;
       case 'feed':
         if (typeof FeedPage !== 'undefined') {
-          FeedPage.render(container);
+          FeedPage.render(container, { restore: route.restore });
           this.currentPage = FeedPage;
         }
         break;
@@ -103,7 +117,7 @@ const Router = {
         break;
       case 'profile':
         if (typeof ProfilePage !== 'undefined') {
-          ProfilePage.render(container, route.id);
+          ProfilePage.render(container, route.id, { restore: route.restore });
           this.currentPage = ProfilePage;
         }
         break;
