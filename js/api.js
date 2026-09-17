@@ -144,6 +144,10 @@ const API = {
     return this.call('updateTheme', { theme });
   },
 
+  async updateHand(hand) {
+    return this.call('updateHand', { hand });
+  },
+
   // ============== POSTS ==============
   async post(postText, mediaUrl = null) {
     return this.call('post', { postText, mediaUrl });

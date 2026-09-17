@@ -91,8 +91,13 @@ function db() {
     try {
         $cols = $pdo->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC);
         $hasTheme = false;
-        foreach ($cols as $c) if ($c['name'] === 'theme') $hasTheme = true;
+        $hasHand = false;
+        foreach ($cols as $c) {
+            if ($c['name'] === 'theme') $hasTheme = true;
+            if ($c['name'] === 'hand') $hasHand = true;
+        }
         if (!$hasTheme) $pdo->exec("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'light'");
+        if (!$hasHand) $pdo->exec("ALTER TABLE users ADD COLUMN hand TEXT NOT NULL DEFAULT 'right'");
     } catch (Exception $e) {}
     return $pdo;
 }
@@ -735,10 +740,10 @@ function handle_getUserEmails($pdo, $user) {
 }
 
 function handle_getMyInfo($pdo, $user) {
-    $stmt = $pdo->prepare('SELECT id, email, created_at, theme FROM users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, email, created_at, theme, hand FROM users WHERE id = ?');
     $stmt->execute([$user['sub']]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    respond(good(['id' => $user['sub'], 'userId' => $user['sub'], 'email' => $row['email'] ?? 'User', 'created_at' => $row['created_at'] ?? 'Unknown', 'theme' => $row['theme'] ?: 'light']));
+    respond(good(['id' => $user['sub'], 'userId' => $user['sub'], 'email' => $row['email'] ?? 'User', 'created_at' => $row['created_at'] ?? 'Unknown', 'theme' => $row['theme'] ?: 'light', 'hand' => $row['hand'] ?: 'right']));
 }
 
 function handle_updateTheme($pdo, $user) {
@@ -749,6 +754,15 @@ function handle_updateTheme($pdo, $user) {
     $stmt = $pdo->prepare('UPDATE users SET theme = ? WHERE id = ?');
     $stmt->execute([$theme, $user['sub']]);
     respond(good(['message' => 'Theme updated']));
+}
+
+function handle_updateHand($pdo, $user) {
+    $hand = $_POST['hand'] ?? '';
+    if (!in_array($hand, ['left', 'right'], true)) bad('Invalid hand', 400);
+
+    $stmt = $pdo->prepare('UPDATE users SET hand = ? WHERE id = ?');
+    $stmt->execute([$hand, $user['sub']]);
+    respond(good(['message' => 'Hand updated']));
 }
 
 function handle_fetchFollowedPosts($pdo, $user) {
@@ -1115,7 +1129,7 @@ $HANDLERS = [
     'deleteComment' => 'handle_deleteComment', 'getPostCommentCounts' => 'handle_getPostCommentCounts',
     'markNotificationsSeen' => 'handle_markNotificationsSeen', 'getPostById' => 'handle_getPostById',
     'getPostPreviews' => 'handle_getPostPreviews',
-    'updateTheme' => 'handle_updateTheme',
+    'updateTheme' => 'handle_updateTheme', 'updateHand' => 'handle_updateHand',
     'log' => 'handle_log_request'
 ];
 

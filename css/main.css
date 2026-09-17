@@ -1019,6 +1019,59 @@ footer {
   color: var(--color-error);
 }
 
+/* ============== HAND TOGGLE ============== */
+/* Left | switch | Right. The checkbox stays a real (hidden) checkbox so the
+   words can highlight off :checked without any JS. */
+.hand-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.hand-toggle-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hand-toggle-word {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.hand-toggle-input:not(:checked) ~ .hand-left,
+.hand-toggle-input:checked ~ .hand-right {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* Neither end is "off", so the track keeps its colour in both positions. */
+.hand-toggle-switch {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+
+.hand-toggle-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s;
+}
+
+.hand-toggle-input:checked ~ .hand-toggle-switch span {
+  transform: translateX(24px);
+}
+
 /* ============== THUMB NAV ============== */
 /* Bottom-right corner bubble menu. (hover: none) + (pointer: coarse) targets
    actual touchscreens, not a desktop browser window that's just been made
@@ -1083,12 +1136,29 @@ footer {
 
 /* Sits on the closed bubble, since that's the only part of this menu visible
    most of the time. Above the toggle's own z-index, and click-through so it
-   can't eat a tap meant for the button underneath. */
+   can't eat a tap meant for the button underneath. Once the menu is open the
+   Notifications item carries the count instead. */
 .thumb-nav-badge {
   position: absolute;
   top: -2px;
   right: -2px;
   z-index: 3;
+  border: 2px solid var(--color-bg);
+  pointer-events: none;
+}
+
+#thumb-nav.open .thumb-nav-badge {
+  display: none;
+}
+
+/* On the dot's inner side, away from the label. Counter-rotated by the item's
+   own --rot so the number stays upright while its dot sits on the arc. */
+.thumb-nav-item-badge {
+  position: absolute;
+  top: -24px;
+  left: 4px;
+  z-index: 2;
+  transform: rotate(calc(-1 * var(--rot)));
   border: 2px solid var(--color-bg);
   pointer-events: none;
 }
@@ -1155,6 +1225,30 @@ footer {
   white-space: nowrap;
   padding: 0 16px 0 12px;
   border-radius: 999px 0 0 999px;
+}
+
+/* Left-handed: the same menu in the other corner. header.js flips the arc
+   and the label rotations; these flip everything that's pinned to a side. */
+#thumb-nav.thumb-nav-left {
+  right: auto;
+  left: 20px;
+}
+
+#thumb-nav.thumb-nav-left .thumb-nav-badge {
+  right: auto;
+  left: -2px;
+}
+
+.thumb-nav-left .thumb-nav-item-badge {
+  left: auto;
+  right: 4px;
+}
+
+.thumb-nav-left .thumb-nav-label {
+  right: auto;
+  left: -8px;
+  padding: 0 12px 0 16px;
+  border-radius: 0 999px 999px 0;
 }
 
 /* ============== RESPONSIVE ============== */

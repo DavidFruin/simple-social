@@ -52,11 +52,11 @@ function renderHeader() {
   updateNotificationBadge();
 }
 
-// Bottom-right corner bubble menu -- only shown on real touch devices (see
-// the (hover: none) and (pointer: coarse) media query in main.css), never on
-// a shrunk desktop browser window. Fans the same nav items out along a
-// quarter-circle arc above/left of the corner, since that's the only
-// direction guaranteed to stay on-screen from a bottom-right anchor.
+// Bottom-corner bubble menu -- only shown on real touch devices (see the
+// (hover: none) and (pointer: coarse) media query in main.css), never on a
+// shrunk desktop browser window. Fans the nav items out along a quarter-circle
+// arc that sweeps up and inward from whichever corner the user's hand setting
+// puts it in, since that's the only direction sure to stay on-screen.
 function renderThumbNav() {
   let container = document.getElementById('thumb-nav');
 
@@ -69,29 +69,34 @@ function renderThumbNav() {
     { href: '/app.html#/feed', label: 'Feed' },
     { href: '/app.html#/create-post', label: 'Post' },
     { href: '/app.html#/search', label: 'Search' },
-    { href: '/app.html#/notifications', label: 'Notifications' },
+    { href: '/app.html#/notifications', label: 'Notifications', badge: true },
     { href: '/app.html#/profile', label: 'Profile' },
     { href: '/app.html#/settings', label: 'Settings' },
     { href: '#', label: 'Logout', logout: true }
   ];
   const radius = 150;
   const angleStep = 90 / (items.length - 1);
+  // Left-handed mirrors the whole thing into the other corner: the arc sweeps
+  // toward the opposite side and the labels hang off the other edge of their
+  // dots (see .thumb-nav-left in main.css), so the rotations flip sign too.
+  const mirror = Store.getHand() === 'left' ? -1 : 1;
 
   const itemsHtml = items.map((item, i) => {
     const angle = angleStep * i;
     const rad = angle * Math.PI / 180;
-    const tx = (-radius * Math.sin(rad)).toFixed(1);
+    const tx = (mirror * -radius * Math.sin(rad)).toFixed(1);
     const ty = (-radius * Math.cos(rad)).toFixed(1);
-    // Labels hang off the dot's left edge, so rotating by (90 - angle) swings
+    // Labels hang off the dot's outer edge, so rotating by (90 - angle) swings
     // that edge around to face straight out from the center: level at the
-    // arc's left end, vertical at its top. Level labels all pointed the same
+    // arc's far end, vertical at its top. Level labels all pointed the same
     // way and ran over each other near the top, where items are barely a few
     // pixels apart vertically.
-    const rot = (90 - angle).toFixed(1);
+    const rot = (mirror * (90 - angle)).toFixed(1);
     return `
       <a href="${item.href}" class="thumb-nav-item" style="--tx: ${tx}px; --ty: ${ty}px; --rot: ${rot}deg; transition-delay: ${i * 25}ms;"${item.logout ? ' data-logout="true"' : ''}>
         <span class="thumb-nav-label">${item.label}</span>
         <span class="thumb-nav-dot"></span>
+        ${item.badge ? '<span class="badge notif-badge thumb-nav-item-badge hidden"></span>' : ''}
       </a>
     `;
   }).join('');
@@ -102,6 +107,7 @@ function renderThumbNav() {
     container.id = 'thumb-nav';
     document.body.appendChild(container);
   }
+  container.classList.toggle('thumb-nav-left', mirror === -1);
 
   container.innerHTML = `
     <button type="button" id="thumb-nav-toggle" class="thumb-nav-toggle" aria-label="Menu" aria-expanded="false">

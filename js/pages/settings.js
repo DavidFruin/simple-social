@@ -17,6 +17,15 @@ const SettingsPage = {
               <option value="hacker">Hacker</option>
             </select>
           </div>
+          <div class="form-group">
+            <label for="hand-toggle">Navigation hand</label>
+            <div class="hand-toggle">
+              <input type="checkbox" id="hand-toggle" class="hand-toggle-input">
+              <span class="hand-toggle-word hand-left">Left</span>
+              <label for="hand-toggle" class="hand-toggle-switch"><span></span></label>
+              <span class="hand-toggle-word hand-right">Right</span>
+            </div>
+          </div>
         </div>
 
         <div class="settings-section">
@@ -51,6 +60,12 @@ const SettingsPage = {
       themeSelect.value = Store.getTheme();
       themeSelect.addEventListener('change', this.handleThemeChange.bind(this));
     }
+
+    const handToggle = document.getElementById('hand-toggle');
+    if (handToggle) {
+      handToggle.checked = Store.getHand() === 'right';
+      handToggle.addEventListener('change', this.handleHandChange.bind(this));
+    }
   },
 
   async handleThemeChange(e) {
@@ -63,6 +78,19 @@ const SettingsPage = {
       showSuccess('Theme updated');
     } catch (err) {
       e.target.value = previousTheme;
+      showError(err.message);
+    }
+  },
+
+  async handleHandChange(e) {
+    const hand = e.target.checked ? 'right' : 'left';
+
+    try {
+      await api.updateHand(hand);
+      Store.setUser({ ...Store.getUser(), hand });
+      showSuccess(`Menu moved to the ${hand}`);
+    } catch (err) {
+      e.target.checked = !e.target.checked;
       showError(err.message);
     }
   },

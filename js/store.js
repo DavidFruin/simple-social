@@ -62,6 +62,11 @@ const Store = {
     return this.state.user?.theme || 'light';
   },
 
+  // Which bottom corner the thumb nav sits in. Right-handed by default.
+  getHand() {
+    return this.state.user?.hand || 'right';
+  },
+
   // Reflects the logged-in user's theme flag as a data-theme attribute on
   // <html>, which css/main.css uses to swap the --color-* variables. Runs on
   // every load and whenever the user object changes, so it applies before the
