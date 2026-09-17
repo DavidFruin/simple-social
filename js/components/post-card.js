@@ -26,6 +26,7 @@ function createPostCard(post, options = {}) {
         ${isOwner ? `<button class="btn-delete-post" data-post-id="${post.id}">Delete</button>` : ''}
       </div>
       <div class="post-body">${escapeHtml(post.text)}</div>
+      <button type="button" class="post-show-more hidden">Show more</button>
       ${mediaHtml}
       <div class="post-footer">
         <div class="like-section">
@@ -130,6 +131,34 @@ function formatTimestamp(timestamp) {
   return label ? `${timestamp} (${label})` : timestamp;
 }
 
+// Delegated "Show more"/"Show less" toggle for posts whose text is cut off
+// by the line-clamp. Installed once at load; works for any dynamically
+// re-rendered post card.
+if (!window.__showMoreDelegated) {
+  window.__showMoreDelegated = true;
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.post-show-more');
+    if (!btn) return;
+    const body = btn.previousElementSibling;
+    if (!body || !body.classList.contains('post-body')) return;
+    const expanded = body.classList.toggle('expanded');
+    btn.textContent = expanded ? 'Show less' : 'Show more';
+  });
+}
+
+// Call after inserting post cards into the DOM (feed/profile, where post text
+// is line-clamped): shows "Show more" only on posts actually cut off by it,
+// not on ones short enough to fit already.
+function initPostTruncation(container) {
+  container.querySelectorAll('.post-body').forEach((body) => {
+    const btn = body.nextElementSibling;
+    if (!btn || !btn.classList.contains('post-show-more')) return;
+    body.classList.remove('expanded');
+    btn.textContent = 'Show more';
+    btn.classList.toggle('hidden', body.scrollHeight <= body.clientHeight + 1);
+  });
+}
+
 // Delegated media-viewer handling. Replaces inline onclick= attributes so the
 // media URL is never interpolated into an executable JS string context.
 // Installed once at load; works for any dynamically re-rendered post card.
@@ -149,6 +178,7 @@ if (!window.__mediaViewerDelegated) {
 }
 
 window.createPostCard = createPostCard;
+window.initPostTruncation = initPostTruncation;
 window.escapeHtml = escapeHtml;
 window.displayEmail = displayEmail;
 window.formatTimestamp = formatTimestamp;

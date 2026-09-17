@@ -135,6 +135,7 @@ const FeedPage = {
     emptyState?.classList.add('hidden');
 
     container.innerHTML = this.posts.map(post => this.renderPostCard(post)).join('');
+    initPostTruncation(container);
 
     loadMoreBtn?.classList.toggle('hidden', !this.hasMore);
 

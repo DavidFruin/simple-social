@@ -247,6 +247,7 @@ container.innerHTML = this.posts.map(post => {
         commentCount: commentCount
       });
     }).join('');
+    initPostTruncation(container);
 
     loadMoreBtn?.classList.toggle('hidden', !this.hasMore);
 
