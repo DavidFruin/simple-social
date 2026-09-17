@@ -16,16 +16,16 @@ add dark mode back into the site
 add a button to the web front end to add a pwa to the homescreen of android and ios
 add push notifications to pwa
 add notifications badge to pwa
+media capture should be three buttons: picture, video, audio
 
 BUGS
 while media lighthouse open page can still scroll
-OTP codes have no attempt limit so someone could guess the 6 digit code within the 10 minutes (security)
-resetPassword api action doesn't enforce the password rules (8-25 chars, upper, lower, number, symbol), only the website checks them (security)
-log api action always returns 401 so front end errors never get logged on the server
+video capture has audio feedback, it shouldn't play any sound while recording video
 profile page adds a document click listener every visit that never gets removed so they pile up
 api-documentation.md is out of date now that api.html exists
 
 STYLE ERRORS
+images are displayed landscape regardless of the angle they were captured at. check the orientation when an image is captured or uploaded, and add a rotate button on the post page to rotate images before posting
 truncated posts only show "..." as a hint that there's more text, easy to miss that you need to expand the post to read the rest
 make date commented line up on comments of posts on expanded post view
 make newest commments on the bottom not the top of the comments
