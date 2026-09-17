@@ -6,8 +6,6 @@ const FeedPage = {
   limit: 25,
   hasMore: true,
   loading: false,
-  scrollHandler: null,
-  scrollDebounce: null,
   postsClickHandler: null,
   postsContainerEl: null,
   loadMoreClickHandler: null,
@@ -36,35 +34,12 @@ const FeedPage = {
   },
 
   attachEventListeners() {
-    this.scrollHandler = () => {
-      if (this.scrollDebounce) return;
-      this.scrollDebounce = setTimeout(() => {
-        this.scrollDebounce = null;
-        if (!this.hasMore || this.loading) return;
-        const scrollHeight = document.documentElement.scrollHeight;
-        const scrollTop = document.documentElement.scrollTop;
-        const clientHeight = document.documentElement.clientHeight;
-        if (scrollTop + clientHeight >= scrollHeight - 100) {
-          this.loadMorePosts();
-        }
-      }, 150);
-    };
-    window.addEventListener('scroll', this.scrollHandler);
-
     this.loadMoreClickHandler = () => this.loadMorePosts();
     document.getElementById('load-more-btn')?.addEventListener('click', this.loadMoreClickHandler);
   },
 
   destroy() {
     this.isActive = false;
-    if (this.scrollHandler) {
-      window.removeEventListener('scroll', this.scrollHandler);
-      this.scrollHandler = null;
-    }
-    if (this.scrollDebounce) {
-      clearTimeout(this.scrollDebounce);
-      this.scrollDebounce = null;
-    }
     if (this.postsClickHandler && this.postsContainerEl) {
       this.postsContainerEl.removeEventListener('click', this.postsClickHandler);
       this.postsClickHandler = null;
