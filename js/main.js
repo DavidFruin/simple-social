@@ -133,21 +133,49 @@ async function checkNotifications() {
   }
 }
 
-function showError(message, container = document.getElementById('main')) {
-  const errorDiv = document.createElement('div');
-  errorDiv.className = 'error-message';
-  errorDiv.textContent = message;
-  container.prepend(errorDiv);
-  setTimeout(() => errorDiv.remove(), 5000);
+// One toast at a time: a new message replaces the current one, and repeating
+// the same message flashes it and restarts its timer instead of stacking.
+let toastEl = null;
+let toastTimer = null;
+
+function showToast(message, type, duration) {
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.className = 'toast';
+    toastEl.addEventListener('click', hideToast);
+    document.body.appendChild(toastEl);
+  }
+
+  const isRepeat = toastEl.classList.contains('toast-visible')
+    && toastEl.dataset.type === type
+    && toastEl.textContent === message;
+
+  toastEl.textContent = message;
+  toastEl.dataset.type = type;
+  toastEl.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  toastEl.classList.remove('toast-error', 'toast-success', 'toast-flash');
+  toastEl.classList.add('toast-' + type, 'toast-visible');
+
+  if (isRepeat) {
+    void toastEl.offsetWidth; // restart the flash animation
+    toastEl.classList.add('toast-flash');
+  }
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, duration);
+}
+
+function hideToast() {
+  toastEl?.classList.remove('toast-visible', 'toast-flash');
+}
+
+function showError(message) {
+  showToast(message, 'error', 5000);
   if (typeof Logger !== 'undefined') Logger.error(message);
 }
 
-function showSuccess(message, container = document.getElementById('main')) {
-  const successDiv = document.createElement('div');
-  successDiv.className = 'success-message';
-  successDiv.textContent = message;
-  container.prepend(successDiv);
-  setTimeout(() => successDiv.remove(), 3000);
+function showSuccess(message) {
+  showToast(message, 'success', 3000);
 }
 
 document.addEventListener('DOMContentLoaded', init);
