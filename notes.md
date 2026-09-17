@@ -19,13 +19,13 @@ add push notifications to pwa
 add notifications badge to pwa
 media capture should be three buttons: picture, video, audio
 cli/interactive cli support for arch linux and nix -- coming soon (debian/ubuntu only for now)
-add a loading spinner
+add a loading spinner in various places
 
-STYLE FEATURES
-dark mode and a color mode: blue theme, red theme, and a hacker theme (green-on-black terminal look). settable in Settings, same place as the existing dark mode / light mode / left-hand / right-hand options.
+STYLE BUGS
+Rounded edges on images and videos unless they are vertical then they don't get rounded corners
 
 BUGS
-
-STYLE ERRORS
-
-MOBILE STYLE ERRORS
+low importance: after posting, the feed doesn't show your own new post for a second -- had to reload the feed to see it
+there is a flash when expanding a post
+when you go back from expanded post you usually are a little bellow where you actually were on the page
+when I go to settings page it is scrolled down a little bit so I can't see the theme selector
