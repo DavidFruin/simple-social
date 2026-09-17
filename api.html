@@ -57,6 +57,9 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                     </ul>
                     <p>Actions marked <strong>Auth: none</strong> work without a token. Everything else returns <code>401</code> without a valid one.</p>
 
+                    <h3>Attempt limits</h3>
+                    <p><code>login</code>, <code>verifyOTP</code>, and <code>verifyRegisterOTP</code> count failed attempts. After 5 failures for the same email, or 20 from the same IP address, within 15 minutes, further attempts return <code>429</code> for 15 minutes. Locking an OTP check also cancels the current code, so a new one has to be requested.</p>
+
                     <h3>Responses</h3>
                     <p>Responses are JSON. Successful responses have <code>"valid": true</code> plus the fields documented for each action:</p>
                     <pre><code>{ "valid": true, "postId": "26.1789611603" }</code></pre>
@@ -163,6 +166,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                             <tr><th>Status</th><th>message</th></tr>
                             <tr><td>400</td><td>Missing credentials</td></tr>
                             <tr><td>401</td><td>Invalid email or password</td></tr>
+                            <tr><td>429</td><td>Too many attempts. Try again in N minutes.</td></tr>
                         </table>
                     </div>
 
@@ -206,6 +210,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                             <tr><td>400</td><td>No OTP requested</td></tr>
                             <tr><td>400</td><td>OTP has expired. Please request a new one.</td></tr>
                             <tr><td>400</td><td>Incorrect OTP</td></tr>
+                            <tr><td>429</td><td>Too many attempts. Try again in N minutes.</td></tr>
                         </table>
                     </div>
 
@@ -265,6 +270,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                             <tr><td>400</td><td>No OTP requested or expired</td></tr>
                             <tr><td>400</td><td>OTP has expired. Please request a new one.</td></tr>
                             <tr><td>400</td><td>Incorrect OTP</td></tr>
+                            <tr><td>429</td><td>Too many attempts. Try again in N minutes.</td></tr>
                         </table>
                     </div>
 
@@ -275,13 +281,18 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                         <table>
                             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
                             <tr><td><code>email</code></td><td>yes</td><td>Account email</td></tr>
-                            <tr><td><code>password</code></td><td>yes</td><td>New password</td></tr>
+                            <tr><td><code>password</code></td><td>yes</td><td>New password: 8&ndash;25 characters with a lowercase letter, an uppercase letter, a number, and a symbol</td></tr>
                             <tr><td><code>confirm</code></td><td>yes</td><td>Must match <code>password</code></td></tr>
                         </table>
                         <pre><code>{ "valid": true, "message": "Password reset successful! Please log in." }</code></pre>
                         <table>
                             <tr><th>Status</th><th>message</th></tr>
                             <tr><td>400</td><td>Passwords do not match or are empty</td></tr>
+                            <tr><td>400</td><td>Password must be 8-25 characters</td></tr>
+                            <tr><td>400</td><td>Password must contain a lowercase letter</td></tr>
+                            <tr><td>400</td><td>Password must contain an uppercase letter</td></tr>
+                            <tr><td>400</td><td>Password must contain a number</td></tr>
+                            <tr><td>400</td><td>Password must contain a symbol</td></tr>
                             <tr><td>403</td><td>Verify your OTP before resetting your password</td></tr>
                             <tr><td>404</td><td>User not found</td></tr>
                         </table>
@@ -793,8 +804,8 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
                             <tr><td><code>level</code></td><td>no</td><td><code>DEBUG</code>, <code>INFO</code>, <code>WARN</code>, or <code>ERROR</code> (default)</td></tr>
                             <tr><td><code>category</code></td><td>no</td><td><code>frontend</code> (default), <code>api</code>, <code>access</code>, or <code>php</code></td></tr>
-                            <tr><td><code>message</code></td><td>no</td><td>Log message</td></tr>
-                            <tr><td><code>extra</code></td><td>no</td><td>Extra details</td></tr>
+                            <tr><td><code>message</code></td><td>no</td><td>Log message (line breaks are removed; cut to 2000 characters)</td></tr>
+                            <tr><td><code>extra</code></td><td>no</td><td>Extra details (same limits as <code>message</code>)</td></tr>
                         </table>
                         <pre><code>{ "valid": true, "message": "Logged" }</code></pre>
                     </div>

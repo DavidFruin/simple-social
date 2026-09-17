@@ -76,6 +76,9 @@ function db() {
     $pdo->exec('CREATE TABLE IF NOT EXISTS comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT, post_id TEXT NOT NULL,
         user_id INTEGER NOT NULL, comment_text TEXT NOT NULL, created_at TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS auth_attempts (
+        attempt_key TEXT PRIMARY KEY, failures INTEGER NOT NULL,
+        window_start INTEGER NOT NULL, locked_until INTEGER NOT NULL DEFAULT 0)');
     $pdo->exec('CREATE TABLE IF NOT EXISTS media (
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
         filename TEXT NOT NULL, type TEXT NOT NULL, path TEXT NOT NULL, created_at TEXT NOT NULL, post_id TEXT)');
@@ -163,6 +166,63 @@ function good($data = []) {
 // submitted code because verify actions only accept 6 digits.
 const OTP_VERIFIED = 'VERIFIED';
 
+// ============== ATTEMPT LIMITS ==============
+// Failed logins and OTP checks are counted per email and per IP. Too many
+// failures inside the window locks that email (or IP) out for the window.
+const ATTEMPT_WINDOW = 900;
+const ATTEMPT_LIMIT_EMAIL = 5;
+const ATTEMPT_LIMIT_IP = 20;
+
+function attemptKeys($scope, $email) {
+    return [
+        'email' => "$scope:email:" . strtolower(trim($email)),
+        'ip' => "$scope:ip:" . ($_SERVER['REMOTE_ADDR'] ?? '-'),
+    ];
+}
+
+function checkAttemptLimit($pdo, $keys) {
+    $stmt = $pdo->prepare('SELECT locked_until FROM auth_attempts WHERE attempt_key = ?');
+    foreach ($keys as $key) {
+        $stmt->execute([$key]);
+        $lockedUntil = (int)$stmt->fetchColumn();
+        if ($lockedUntil <= time()) continue;
+        $minutes = (int)ceil(($lockedUntil - time()) / 60);
+        bad("Too many attempts. Try again in $minutes minute" . ($minutes === 1 ? '' : 's') . '.', 429);
+    }
+}
+
+// Returns true if this failure locked the email out.
+function recordFailedAttempt($pdo, $keys) {
+    $now = time();
+    $limits = ['email' => ATTEMPT_LIMIT_EMAIL, 'ip' => ATTEMPT_LIMIT_IP];
+    $select = $pdo->prepare('SELECT failures, window_start FROM auth_attempts WHERE attempt_key = ?');
+    $save = $pdo->prepare('INSERT OR REPLACE INTO auth_attempts (attempt_key, failures, window_start, locked_until) VALUES (?, ?, ?, ?)');
+    $emailLocked = false;
+    foreach ($keys as $type => $key) {
+        $select->execute([$key]);
+        $row = $select->fetch(PDO::FETCH_ASSOC);
+        $inWindow = $row && $now - $row['window_start'] < ATTEMPT_WINDOW;
+        $failures = $inWindow ? $row['failures'] + 1 : 1;
+        $windowStart = $inWindow ? $row['window_start'] : $now;
+        $locked = $failures >= $limits[$type];
+        $save->execute([$key, $locked ? 0 : $failures, $locked ? $now : $windowStart, $locked ? $now + ATTEMPT_WINDOW : 0]);
+        if ($locked && $type === 'email') $emailLocked = true;
+    }
+    return $emailLocked;
+}
+
+function clearAttempts($pdo, $keys) {
+    $pdo->prepare('DELETE FROM auth_attempts WHERE attempt_key = ?')->execute([$keys['email']]);
+}
+
+function validatePasswordRules($password) {
+    if (strlen($password) < 8 || strlen($password) > 25) bad('Password must be 8-25 characters', 400);
+    if (!preg_match('/[a-z]/', $password)) bad('Password must contain a lowercase letter', 400);
+    if (!preg_match('/[A-Z]/', $password)) bad('Password must contain an uppercase letter', 400);
+    if (!preg_match('/\d/', $password)) bad('Password must contain a number', 400);
+    if (!preg_match('/[~!@#$%^&*()\-_+=\[\];\'"\/.,<>?:"{}|]/', $password)) bad('Password must contain a symbol', 400);
+}
+
 function validateContent($text, $errorMsg = 'You are trying to post illegal characters') {
     if (preg_match('/[^\x20-\x7E\n\r\xA0-\xFF]/u', $text)) bad($errorMsg, 400);
 }
@@ -173,10 +233,17 @@ function handle_login($pdo) {
     $password = $_POST['password'] ?? '';
     if (!$email || !$password) bad('Missing credentials', 400);
 
+    $keys = attemptKeys('login', $email);
+    checkAttemptLimit($pdo, $keys);
+
     $stmt = $pdo->prepare('SELECT id, password, email FROM users WHERE LOWER(email) = LOWER(?)');
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$user || !password_verify($password, $user['password'])) bad('Invalid email or password', 401);
+    if (!$user || !password_verify($password, $user['password'])) {
+        recordFailedAttempt($pdo, $keys);
+        bad('Invalid email or password', 401);
+    }
+    clearAttempts($pdo, $keys);
 
     $payload = ['sub' => $user['id'], 'exp' => time() + 86400];
     $jwt = jwtEncode($payload);
@@ -227,6 +294,8 @@ function handle_sendOTP($pdo) {
 function handle_verifyOTP($pdo) {
     $email = trim($_POST['email'] ?? '');
     $otp = trim($_POST['otp'] ?? '');
+    $keys = attemptKeys('otp', $email);
+    checkAttemptLimit($pdo, $keys);
     if (!preg_match('/^\d{6}$/', $otp)) bad('Incorrect OTP', 400);
 
     $stmt = $pdo->prepare('SELECT id, reset_otp, reset_expires FROM users WHERE LOWER(email) = LOWER(?)');
@@ -234,7 +303,13 @@ function handle_verifyOTP($pdo) {
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row || !$row['reset_otp']) bad('No OTP requested or expired', 400);
     if (time() > $row['reset_expires']) bad('OTP has expired. Please request a new one.', 400);
-    if ($otp !== $row['reset_otp']) bad('Incorrect OTP', 400);
+    if ($otp !== $row['reset_otp']) {
+        if (recordFailedAttempt($pdo, $keys)) {
+            $pdo->prepare('UPDATE users SET reset_otp = NULL, reset_expires = 0 WHERE id = ?')->execute([$row['id']]);
+        }
+        bad('Incorrect OTP', 400);
+    }
+    clearAttempts($pdo, $keys);
 
     // Mark verified so resetPassword can require it (valid 10 more minutes).
     $stmt = $pdo->prepare('UPDATE users SET reset_otp = ?, reset_expires = ? WHERE id = ?');
@@ -247,6 +322,7 @@ function handle_resetPassword($pdo) {
     $password = $_POST['password'] ?? '';
     $confirm = $_POST['confirm'] ?? '';
     if (!$email || !$password || $password !== $confirm) bad('Passwords do not match or are empty', 400);
+    validatePasswordRules($password);
 
     $stmt = $pdo->prepare('SELECT id, reset_otp, reset_expires FROM users WHERE LOWER(email) = LOWER(?)');
     $stmt->execute([$email]);
@@ -289,13 +365,21 @@ function handle_verifyRegisterOTP($pdo) {
     $email = trim($_POST['email'] ?? '');
     $otp = trim($_POST['otp'] ?? '');
     if (!$email || strlen($otp) !== 6) bad('Email and 6-digit OTP required', 400);
+    $keys = attemptKeys('regotp', $email);
+    checkAttemptLimit($pdo, $keys);
 
     $stmt = $pdo->prepare('SELECT otp, dateCreated FROM pending_users WHERE email = ?');
     $stmt->execute([$email]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row || !$row['otp']) bad('No OTP requested', 400);
     if (time() - $row['dateCreated'] > 600) bad('OTP has expired. Please request a new one.', 400);
-    if ($otp !== $row['otp']) bad('Incorrect OTP', 400);
+    if ($otp !== $row['otp']) {
+        if (recordFailedAttempt($pdo, $keys)) {
+            $pdo->prepare('DELETE FROM pending_users WHERE email = ?')->execute([$email]);
+        }
+        bad('Incorrect OTP', 400);
+    }
+    clearAttempts($pdo, $keys);
 
     // Mark verified so finishRegister can require it (valid 10 more minutes).
     $stmt = $pdo->prepare('UPDATE pending_users SET otp = ?, dateCreated = ? WHERE email = ?');
@@ -309,11 +393,7 @@ function handle_finishRegister($pdo) {
     $confirm = $_POST['confirm'] ?? '';
 
     if (!$email || !$password || $password !== $confirm) bad('Passwords do not match or are empty', 400);
-    if (strlen($password) < 8 || strlen($password) > 25) bad('Password must be 8-25 characters', 400);
-    if (!preg_match('/[a-z]/', $password)) bad('Password must contain a lowercase letter', 400);
-    if (!preg_match('/[A-Z]/', $password)) bad('Password must contain an uppercase letter', 400);
-    if (!preg_match('/\d/', $password)) bad('Password must contain a number', 400);
-    if (!preg_match('/[~!@#$%^&*()\-_+=\[\];\'"\/.,<>?:"{}|]/', $password)) bad('Password must contain a symbol', 400);
+    validatePasswordRules($password);
 
     $stmt = $pdo->prepare('SELECT otp, dateCreated FROM pending_users WHERE email = ?');
     $stmt->execute([$email]);
@@ -999,7 +1079,7 @@ function handle_getPostCommentCounts($pdo, $user) {
 }
 
 // ============== DISPATCHER ==============
-$PUBLIC_ENDPOINTS = ['login', 'logout', 'sendOTP', 'verifyOTP', 'resetPassword', 'sendRegisterOTP', 'verifyRegisterOTP', 'finishRegister', 'log'];
+$PUBLIC_ENDPOINTS = ['login', 'logout', 'sendOTP', 'verifyOTP', 'resetPassword', 'sendRegisterOTP', 'verifyRegisterOTP', 'finishRegister'];
 
 $HANDLERS = [
     'login' => 'handle_login', 'logout' => 'handle_logout', 'sendOTP' => 'handle_sendOTP',

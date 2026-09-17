@@ -98,12 +98,14 @@ function handle_log_request($pdo, $user) {
 
     $level = $_POST['level'] ?? 'ERROR';
     $category = $_POST['category'] ?? 'frontend';
-    $message = $_POST['message'] ?? '';
-    $extra = $_POST['extra'] ?? '';
+    // One line per entry: strip line breaks so a client can't forge log lines.
+    $clean = fn($v) => substr(str_replace(["\r", "\n"], ' ', (string)$v), 0, 2000);
+    $message = $clean($_POST['message'] ?? '');
+    $extra = $clean($_POST['extra'] ?? '');
 
     $context = [
         'user_id' => $user['sub'] ?? '-',
-        'url' => $_SERVER['HTTP_REFERER'] ?? $_POST['url'] ?? '-',
+        'url' => $clean($_SERVER['HTTP_REFERER'] ?? $_POST['url'] ?? '-'),
         'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '-',
         'ip' => $_SERVER['REMOTE_ADDR'] ?? '-',
         'extra' => $extra,

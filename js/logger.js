@@ -2,7 +2,10 @@
 const Logger = {
   send(level, category, message, extra = '') {
     try {
-      const user = (typeof Store !== 'undefined' && Store.getUser) ? Store.getUser() : null;
+      // The log action requires a logged-in user, so there's nothing to send without a token.
+      const jwt = (typeof Store !== 'undefined' && Store.getJwt) ? Store.getJwt() : null;
+      if (!jwt) return;
+
       const body = new URLSearchParams({
         action: 'log',
         level: level,
@@ -12,18 +15,17 @@ const Logger = {
         extra: extra,
       });
 
-      // Fire-and-forget — non-blocking
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body.toString()], { type: 'application/x-www-form-urlencoded' });
-        navigator.sendBeacon('/api.php', blob);
-      } else {
-        fetch('/api.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-          keepalive: true,
-        }).catch(() => {});
-      }
+      // Fire-and-forget. sendBeacon can't send an Authorization header, so use
+      // fetch with keepalive so logs still go out if the page is closing.
+      fetch('/api.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${jwt}`,
+        },
+        body: body.toString(),
+        keepalive: true,
+      }).catch(() => {});
     } catch (e) {
       // Logger must never throw
     }
