@@ -58,7 +58,13 @@ const ProfilePage = {
       this.renderFollowButton(this.isFollowing);
       this.renderPosts();
       this.attachDropdownListeners();
-      window.scrollTo(0, this.scrollPosition);
+      // Right after innerHTML is set, images/videos in the new post cards
+      // haven't reported their size yet, so the page is shorter than it will
+      // be -- scrolling now can land short of the real target. Two rAFs wait
+      // for a full layout+paint cycle first.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        window.scrollTo(0, this.scrollPosition);
+      }));
     } else {
       this.clearCache();
       this.userId = targetUserId;

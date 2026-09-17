@@ -36,7 +36,13 @@ const FeedPage = {
     // restore scroll. Nav clicks and first visits load fresh.
     if (restore && this.posts.length > 0) {
       this.renderPosts();
-      window.scrollTo(0, this.scrollPosition);
+      // Right after innerHTML is set, images/videos in the new post cards
+      // haven't reported their size yet, so the page is shorter than it will
+      // be -- scrolling now can land short of the real target. Two rAFs wait
+      // for a full layout+paint cycle first.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        window.scrollTo(0, this.scrollPosition);
+      }));
     } else {
       this.scrollPosition = 0;
       this.loadPosts();
