@@ -4,7 +4,17 @@ const SettingsPage = {
     container.innerHTML = `
       <div class="page-container">
         <h1>Account Settings</h1>
-        
+
+        <div class="settings-section">
+          <h2>Info</h2>
+          <ul class="settings-links">
+            <li><a href="/about.html">About</a></li>
+            <li><a href="/api.html">API</a></li>
+            <li><a href="/conduct.html">Code of Conduct</a></li>
+            <li><a href="/download.html">Download</a></li>
+          </ul>
+        </div>
+
         <div class="settings-section">
           <h2>Delete Account</h2>
           <p class="warning-text">Warning: This action cannot be undone. All your data will be permanently deleted.</p>
