@@ -1403,6 +1403,12 @@ footer {
   object-fit: contain;
   cursor: pointer;
   display: block;
+  /* .post-media's own border-radius only shows where the media reaches its
+     corners, which -- now that the letterbox bars match the card background
+     -- is never, for tall media letterboxed on the sides. Rounding the media
+     itself keeps the corners visible regardless of how much letterboxing
+     there is. */
+  border-radius: var(--border-radius);
 }
 
 .post-media .video-play-icon {
