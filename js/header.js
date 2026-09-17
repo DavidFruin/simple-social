@@ -77,11 +77,18 @@ function renderThumbNav() {
   const angleStep = 90 / (items.length - 1);
 
   const itemsHtml = items.map((item, i) => {
-    const rad = (angleStep * i) * Math.PI / 180;
+    const angle = angleStep * i;
+    const rad = angle * Math.PI / 180;
     const tx = (-radius * Math.sin(rad)).toFixed(1);
     const ty = (-radius * Math.cos(rad)).toFixed(1);
+    // Labels hang off the dot's left edge, so rotating by (90 - angle) swings
+    // that edge around to face straight out from the center: level at the
+    // arc's left end, vertical at its top. Level labels all pointed the same
+    // way and ran over each other near the top, where items are barely a few
+    // pixels apart vertically.
+    const rot = (90 - angle).toFixed(1);
     return `
-      <a href="${item.href}" class="thumb-nav-item" style="--tx: ${tx}px; --ty: ${ty}px; transition-delay: ${i * 25}ms;"${item.logout ? ' data-logout="true"' : ''}>
+      <a href="${item.href}" class="thumb-nav-item" style="--tx: ${tx}px; --ty: ${ty}px; --rot: ${rot}deg; transition-delay: ${i * 25}ms;"${item.logout ? ' data-logout="true"' : ''}>
         <span class="thumb-nav-label">${item.label}</span>
         <span class="thumb-nav-dot"></span>
       </a>
