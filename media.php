@@ -133,6 +133,25 @@ function getOutputExtension($type) {
     return null;
 }
 
+// Phones save photos sideways plus an EXIF tag saying which way is up. GD
+// ignores that tag (and it's lost on WebP conversion), so apply it to the
+// pixels. Returns the image unchanged if EXIF can't be read.
+function applyExifOrientation($img, $inputPath) {
+    if (!function_exists('exif_read_data')) return $img;
+    $exif = @exif_read_data($inputPath);
+    $orientation = (int)($exif['Orientation'] ?? 1);
+    if ($orientation === 2) imageflip($img, IMG_FLIP_HORIZONTAL);
+    if ($orientation === 4) imageflip($img, IMG_FLIP_VERTICAL);
+    if ($orientation === 5 || $orientation === 7) imageflip($img, IMG_FLIP_VERTICAL);
+    $angles = [3 => 180, 5 => -90, 6 => -90, 7 => 90, 8 => 90];
+    if (!isset($angles[$orientation])) return $img;
+    $rotated = imagerotate($img, $angles[$orientation], 0);
+    if (!$rotated) return $img;
+    imagedestroy($img);
+    logMsg("processImage: applied EXIF orientation $orientation");
+    return $rotated;
+}
+
 function processImage($inputPath, $outputPath) {
     logMsg("processImage: input=$inputPath output=$outputPath");
     
@@ -168,17 +187,20 @@ function processImage($inputPath, $outputPath) {
         logMsg("processImage ERROR: failed to load image");
         return false;
     }
+
+    if ($inputExt === "jpg" || $inputExt === "jpeg") {
+        $src = applyExifOrientation($src, $inputPath);
+    }
     
     $srcWidth = imagesx($src);
     $srcHeight = imagesy($src);
     logMsg("processImage: original size = {$srcWidth}x{$srcHeight}");
     
-    // Resize if larger than 1920x1080
-    $maxWidth = 1920;
-    $maxHeight = 1080;
+    // Resize so the longest side is at most 1920px (portrait or landscape)
+    $maxSide = 1920;
     
-    if ($srcWidth > $maxWidth || $srcHeight > $maxHeight) {
-        $ratio = min($maxWidth / $srcWidth, $maxHeight / $srcHeight);
+    if (max($srcWidth, $srcHeight) > $maxSide) {
+        $ratio = $maxSide / max($srcWidth, $srcHeight);
         $newWidth = (int)($srcWidth * $ratio);
         $newHeight = (int)($srcHeight * $ratio);
         

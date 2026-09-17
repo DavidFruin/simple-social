@@ -745,7 +745,7 @@ action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre
                     <div class="endpoint" id="uploadMedia">
                         <h3>uploadMedia</h3>
                         <p class="endpoint-meta">POST /media.php &middot; multipart/form-data &middot; Auth: required</p>
-                        <p>Uploads a file to attach to a post. Pass the returned <code>mediaUrl</code> to <a href="#post"><code>post</code></a>. Images are converted to WebP and scaled down to fit within 1920&times;1080. <code>mediaId</code> is returned as a string.</p>
+                        <p>Uploads a file to attach to a post. Pass the returned <code>mediaUrl</code> to <a href="#post"><code>post</code></a>. Images are turned upright using their EXIF orientation, converted to WebP, and scaled down so the longest side is at most 1920px. <code>mediaId</code> is returned as a string.</p>
                         <table>
                             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
                             <tr><td><code>action</code></td><td>yes</td><td><code>uploadMedia</code></td></tr>
