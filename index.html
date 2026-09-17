@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Social</title>
+    <script>
+        // The app used to live here; forward old links like /#/feed to it.
+        if (location.hash.startsWith('#/')) location.replace('/app.html' + location.hash);
+    </script>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="icon" type="image/png" href="/site-icon.png">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="header-content">
+                <a href="/" class="logo">Simple Social</a>
+                <nav>
+                    <a href="/about.html">About</a>
+                    <a href="/api.html">API</a>
+                    <a href="/conduct.html">Code of Conduct</a>
+                    <a href="/download.html">Download</a>
+                    <a href="/app.html#/register">Register</a>
+                    <a href="/app.html#/login">Login</a>
+                </nav>
+            </div>
+        </header>
+        <main id="main">
+            <div class="page-container landing">
+                <h1>Simple Social</h1>
+                <p class="landing-byline">by David Fruin</p>
+                <a href="/app.html#/login" class="btn btn-primary btn-large">Login</a>
+                <p class="landing-author">
+                    <span>Author</span>
+                    <a href="https://davidfruin.com">davidfruin.com</a>
+                </p>
+            </div>
+        </main>
+        <footer>
+            <p>&copy; 2026 Simple Social</p>
+        </footer>
+    </div>
+</body>
+</html>

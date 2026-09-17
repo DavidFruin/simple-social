@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation - Simple Social</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="icon" type="image/png" href="/site-icon.png">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="header-content">
+                <a href="/" class="logo">Simple Social</a>
+                <nav>
+                    <a href="/about.html">About</a>
+                    <a href="/api.html">API</a>
+                    <a href="/conduct.html">Code of Conduct</a>
+                    <a href="/download.html">Download</a>
+                    <a href="/app.html#/register">Register</a>
+                    <a href="/app.html#/login">Login</a>
+                </nav>
+            </div>
+        </header>
+        <main id="main">
+            <div class="page-container page-wide">
+                <div class="static-card">
+                    <h1>API Documentation</h1>
+                    <p>Everything Simple Social does goes through this API, so you can build your own front end with it. Please follow the <a href="/conduct.html">Code of Conduct</a> when using it.</p>
+
+                    <h2 id="basics">Basics</h2>
+
+                    <h3>Endpoints</h3>
+                    <div class="table-scroll">
+                    <table>
+                        <tr><th>URL</th><th>Used for</th></tr>
+                        <tr><td><code>https://dev.davidfruin.com/api.php</code></td><td>Every action except media uploads</td></tr>
+                        <tr><td><code>https://dev.davidfruin.com/media.php</code></td><td><code>uploadMedia</code> and <code>deleteMedia</code></td></tr>
+                    </table>
+                    </div>
+
+                    <h3>Requests</h3>
+                    <p>Every request is an HTTP <code>POST</code>. Send parameters as <code>application/x-www-form-urlencoded</code>, except <code>uploadMedia</code>, which uses <code>multipart/form-data</code>. JSON request bodies are not supported. The <code>action</code> parameter picks what to do.</p>
+                    <pre><code>POST /api.php
+Content-Type: application/x-www-form-urlencoded
+
+action=login&amp;email=you%40example.com&amp;password=YourPassword1!</code></pre>
+                    <p>Parameters that take a list of IDs (<code>userIds</code>, <code>postIds</code>) expect a JSON array encoded as a string, for example <code>postIds=["26.1789611603","8.1"]</code>.</p>
+
+                    <h3>Authentication</h3>
+                    <p>Call <a href="#login"><code>login</code></a> to get a JWT, then send it on every protected request:</p>
+                    <pre><code>Authorization: Bearer &lt;jwt&gt;</code></pre>
+                    <ul>
+                        <li>Tokens expire 24 hours after login.</li>
+                        <li>Only your most recent login's token is valid. Logging in again, from any app, invalidates the previous token.</li>
+                        <li><a href="#logout"><code>logout</code></a> invalidates the token immediately.</li>
+                    </ul>
+                    <p>Actions marked <strong>Auth: none</strong> work without a token. Everything else returns <code>401</code> without a valid one.</p>
+
+                    <h3>Responses</h3>
+                    <p>Responses are JSON. Successful responses have <code>"valid": true</code> plus the fields documented for each action:</p>
+                    <pre><code>{ "valid": true, "postId": "26.1789611603" }</code></pre>
+                    <p>Errors have <code>"valid": false</code> and a human-readable message. Most errors use the key <code>message</code>, but some general errors (see below) use <code>error</code>, so read whichever is present:</p>
+                    <pre><code>{ "valid": false, "message": "Post not found" }
+{ "valid": false, "error": "Unauthorized" }</code></pre>
+
+                    <h3>Errors any action can return</h3>
+                    <div class="table-scroll">
+                    <table>
+                        <tr><th>Status</th><th>Body</th><th>When</th></tr>
+                        <tr><td>400</td><td><code>{"valid":false,"message":"Missing action"}</code></td><td>No <code>action</code> parameter</td></tr>
+                        <tr><td>400</td><td><code>{"valid":false,"message":"Unknown action"}</code></td><td><code>action</code> isn't recognized</td></tr>
+                        <tr><td>401</td><td><code>{"valid":false,"error":"Unauthorized"}</code></td><td>Missing, expired, or replaced token on a protected action. <code>media.php</code> uses <code>message</code> instead of <code>error</code>.</td></tr>
+                        <tr><td>405</td><td><code>{"valid":false,"message":"Method not allowed"}</code></td><td>Request wasn't a <code>POST</code> (<code>api.php</code> only)</td></tr>
+                        <tr><td>500</td><td><code>{"valid":false,"error":"Server error. Please try again."}</code></td><td>Unexpected server failure</td></tr>
+                    </table>
+                    </div>
+
+                    <h3>Data formats</h3>
+                    <ul>
+                        <li><strong>Timestamps</strong> are strings in server time: <code>"2026-09-16 19:20:03"</code>. Follow timestamps from very old accounts may be the string <code>"Unknown"</code>.</li>
+                        <li><strong>Post IDs</strong> are strings in the form <code>"&lt;ownerUserId&gt;.&lt;unixTime&gt;"</code>, for example <code>"26.1789611603"</code>.</li>
+                        <li><strong>User IDs</strong> are numbers.</li>
+                        <li><strong>Media URLs</strong> are paths like <code>/media/26/image/26_image_20260916192002_591227.webp</code>. Prefix them with <code>https://dev.davidfruin.com</code> to load the file. Posts without media have <code>"mediaUrl": null</code>.</li>
+                        <li><strong>Text limits:</strong> posts and comments are limited to 5000 characters and may only contain printable ASCII, newlines, and Latin-1 characters (such as é, ñ, ¿). Emoji are rejected.</li>
+                    </ul>
+
+                    <h3>Post object</h3>
+                    <p>Returned by the post-listing actions and <code>getPostById</code>:</p>
+                    <pre><code>{
+  "id": "26.1789611603",
+  "text": "Testing the new interactive CLI wizard",
+  "timestamp": "2026-09-16 19:20:03",
+  "likes": [
+    { "userId": 1, "timestamp": "2026-09-16 19:43:02" }
+  ],
+  "mediaUrl": "/media/26/image/26_image_20260916192002_591227.webp",
+  "userID": 26,
+  "userEmail": "davefruin@gmail.com"
+}</code></pre>
+
+                    <h2 id="actions">Actions</h2>
+                    <ul class="api-toc">
+                        <li><a href="#login">login</a></li>
+                        <li><a href="#logout">logout</a></li>
+                        <li><a href="#sendRegisterOTP">sendRegisterOTP</a></li>
+                        <li><a href="#verifyRegisterOTP">verifyRegisterOTP</a></li>
+                        <li><a href="#finishRegister">finishRegister</a></li>
+                        <li><a href="#sendOTP">sendOTP</a></li>
+                        <li><a href="#verifyOTP">verifyOTP</a></li>
+                        <li><a href="#resetPassword">resetPassword</a></li>
+                        <li><a href="#getMyInfo">getMyInfo</a></li>
+                        <li><a href="#getUserInfo">getUserInfo</a></li>
+                        <li><a href="#getUsers">getUsers</a></li>
+                        <li><a href="#getUserEmails">getUserEmails</a></li>
+                        <li><a href="#deleteAccount">deleteAccount</a></li>
+                        <li><a href="#post">post</a></li>
+                        <li><a href="#deletePost">deletePost</a></li>
+                        <li><a href="#getPostById">getPostById</a></li>
+                        <li><a href="#getMyPosts">getMyPosts</a></li>
+                        <li><a href="#getUserPosts">getUserPosts</a></li>
+                        <li><a href="#fetchFollowedPosts">fetchFollowedPosts</a></li>
+                        <li><a href="#getPostPreviews">getPostPreviews</a></li>
+                        <li><a href="#likePost">likePost</a></li>
+                        <li><a href="#unlikePost">unlikePost</a></li>
+                        <li><a href="#getPostLikes">getPostLikes</a></li>
+                        <li><a href="#createComment">createComment</a></li>
+                        <li><a href="#getPostComments">getPostComments</a></li>
+                        <li><a href="#deleteComment">deleteComment</a></li>
+                        <li><a href="#getPostCommentCounts">getPostCommentCounts</a></li>
+                        <li><a href="#followUser">followUser</a></li>
+                        <li><a href="#unfollowUser">unfollowUser</a></li>
+                        <li><a href="#isFollowing">isFollowing</a></li>
+                        <li><a href="#getMyFollows">getMyFollows</a></li>
+                        <li><a href="#getMyFollowers">getMyFollowers</a></li>
+                        <li><a href="#getNotifications">getNotifications</a></li>
+                        <li><a href="#getUnseenNotificationCount">getUnseenNotificationCount</a></li>
+                        <li><a href="#markNotificationsSeen">markNotificationsSeen</a></li>
+                        <li><a href="#uploadMedia">uploadMedia</a></li>
+                        <li><a href="#deleteMedia">deleteMedia</a></li>
+                        <li><a href="#log">log</a></li>
+                    </ul>
+
+                    <!-- ============== ACCOUNT ============== -->
+                    <h2 id="account">Account</h2>
+
+                    <div class="endpoint" id="login">
+                        <h3>login</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
+                        <p>Signs in and returns a JWT for protected actions.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>email</code></td><td>yes</td><td>Account email (not case-sensitive)</td></tr>
+                            <tr><td><code>password</code></td><td>yes</td><td>Account password</td></tr>
+                        </table>
+                        <pre><code>{
+  "valid": true,
+  "message": "Login successful",
+  "userId": 26,
+  "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing credentials</td></tr>
+                            <tr><td>401</td><td>Invalid email or password</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="logout">
+                        <h3>logout</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: none (send the token to invalidate it)</p>
+                        <p>Invalidates the token sent in the <code>Authorization</code> header. Always succeeds.</p>
+                        <pre><code>{ "valid": true, "message": "Logged out" }</code></pre>
+                    </div>
+
+                    <div class="endpoint" id="sendRegisterOTP">
+                        <h3>sendRegisterOTP</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
+                        <p>Step 1 of registration. Emails a 6-digit code that is valid for 10 minutes. Requesting again replaces the previous code.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>email</code></td><td>yes</td><td>Email to register</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "message": "OTP sent to your email. Check inbox/spam." }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Valid email required</td></tr>
+                            <tr><td>400</td><td>Email already registered</td></tr>
+                            <tr><td>500</td><td>Failed to send email.</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="verifyRegisterOTP">
+                        <h3>verifyRegisterOTP</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
+                        <p>Step 2 of registration. Checks the emailed code.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>email</code></td><td>yes</td><td>Email being registered</td></tr>
+                            <tr><td><code>otp</code></td><td>yes</td><td>6-digit code from the email</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "message": "OTP verified! Set your password." }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Email and 6-digit OTP required</td></tr>
+                            <tr><td>400</td><td>No OTP requested</td></tr>
+                            <tr><td>400</td><td>OTP has expired. Please request a new one.</td></tr>
+                            <tr><td>400</td><td>Incorrect OTP</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="finishRegister">
+                        <h3>finishRegister</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
+                        <p>Step 3 of registration. Call after <code>verifyRegisterOTP</code> succeeds, within 10 minutes of requesting the code. Afterwards, call <code>login</code>.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>email</code></td><td>yes</td><td>Email being registered</td></tr>
+                            <tr><td><code>password</code></td><td>yes</td><td>8&ndash;25 characters with a lowercase letter, an uppercase letter, a number, and a symbol</td></tr>
+                            <tr><td><code>confirm</code></td><td>yes</td><td>Must match <code>password</code></td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "message": "Account created successfully!" }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Passwords do not match or are empty</td></tr>
+                            <tr><td>400</td><td>Password must be 8-25 characters</td></tr>
+                            <tr><td>400</td><td>Password must contain a lowercase letter</td></tr>
+                            <tr><td>400</td><td>Password must contain an uppercase letter</td></tr>
+                            <tr><td>400</td><td>Password must contain a number</td></tr>
+                            <tr><td>400</td><td>Password must contain a symbol</td></tr>
+                            <tr><td>400</td><td>Session expired. Please start over.</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="sendOTP">
+                        <h3>sendOTP</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
+                        <p>Step 1 of a password reset. Emails a 6-digit code that is valid for 10 minutes.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>email</code></td><td>yes</td><td>Account email</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "message": "OTP sent to your email. Check inbox/spam." }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Valid email required</td></tr>
+                            <tr><td>404</td><td>No account found with this email</td></tr>
+                            <tr><td>500</td><td>Failed to send email. Try again or contact support.</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="verifyOTP">
+                        <h3>verifyOTP</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
+                        <p>Step 2 of a password reset. Checks the emailed code. A code can only be verified once.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>email</code></td><td>yes</td><td>Account email</td></tr>
+                            <tr><td><code>otp</code></td><td>yes</td><td>6-digit code from the email</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "message": "OTP verified! Set your new password." }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>No OTP requested or expired</td></tr>
+                            <tr><td>400</td><td>OTP has expired. Please request a new one.</td></tr>
+                            <tr><td>400</td><td>Incorrect OTP</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="resetPassword">
+                        <h3>resetPassword</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: none</p>
+                        <p>Step 3 of a password reset. Call after <code>verifyOTP</code> succeeds.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>email</code></td><td>yes</td><td>Account email</td></tr>
+                            <tr><td><code>password</code></td><td>yes</td><td>New password</td></tr>
+                            <tr><td><code>confirm</code></td><td>yes</td><td>Must match <code>password</code></td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "message": "Password reset successful! Please log in." }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Passwords do not match or are empty</td></tr>
+                            <tr><td>404</td><td>User not found</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="deleteAccount">
+                        <h3>deleteAccount</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Permanently deletes your account, posts, comments, likes, follows, notifications, and uploaded media. This cannot be undone.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>password</code></td><td>yes</td><td>Your current password</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "message": "Account deleted successfully" }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Password required</td></tr>
+                            <tr><td>401</td><td>Incorrect password</td></tr>
+                        </table>
+                    </div>
+
+                    <!-- ============== USERS ============== -->
+                    <h2 id="users">Users</h2>
+
+                    <div class="endpoint" id="getMyInfo">
+                        <h3>getMyInfo</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Returns the signed-in user. <code>id</code> and <code>userId</code> are the same value.</p>
+                        <pre><code>{
+  "valid": true,
+  "id": 26,
+  "userId": 26,
+  "email": "davefruin@gmail.com",
+  "created_at": "2026-04-13 22:17:00"
+}</code></pre>
+                    </div>
+
+                    <div class="endpoint" id="getUserInfo">
+                        <h3>getUserInfo</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Returns another user's email and join date. <code>created_at</code> is <code>"Unknown"</code> if it wasn't recorded.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>userId</code></td><td>yes</td><td>User ID</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "email": "annabegomez@gmail.com", "created_at": "2026-02-25 22:54:00" }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Invalid user ID</td></tr>
+                            <tr><td>404</td><td>User not found</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="getUsers">
+                        <h3>getUsers</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Returns every user except you, sorted by email.</p>
+                        <pre><code>{
+  "valid": true,
+  "users": [
+    { "id": 8, "email": "annabegomez@gmail.com", "created_at": "2026-02-25 22:54:00" }
+  ]
+}</code></pre>
+                    </div>
+
+                    <div class="endpoint" id="getUserEmails">
+                        <h3>getUserEmails</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Looks up emails for a list of user IDs. The result is keyed by user ID. IDs that don't exist are left out.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>userIds</code></td><td>yes</td><td>JSON array of user IDs, e.g. <code>[1,8]</code></td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "emails": { "1": "me@davidfruin.com", "8": "annabegomez@gmail.com" } }</code></pre>
+                    </div>
+
+                    <!-- ============== POSTS ============== -->
+                    <h2 id="posts">Posts</h2>
+
+                    <div class="endpoint" id="post">
+                        <h3>post</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Creates a post. To attach media, upload it first with <a href="#uploadMedia"><code>uploadMedia</code></a> and pass the returned <code>mediaUrl</code>.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postText</code></td><td>yes</td><td>Post text (up to 5000 characters, see <a href="#basics">text limits</a>)</td></tr>
+                            <tr><td><code>mediaUrl</code></td><td>no</td><td>A <code>mediaUrl</code> you uploaded</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "postId": "26.1789611603" }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Post text required</td></tr>
+                            <tr><td>400</td><td>You are trying to make a post that is longer than 5K characters</td></tr>
+                            <tr><td>400</td><td>You are trying to post illegal characters</td></tr>
+                            <tr><td>400</td><td>Invalid mediaUrl or not owned by user</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="deletePost">
+                        <h3>deletePost</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Deletes one of your posts, along with its media and related notifications.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postId</code></td><td>yes</td><td>ID of your post</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "deleted": true }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing post ID</td></tr>
+                            <tr><td>403</td><td>You can only delete your own posts</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="getPostById">
+                        <h3>getPostById</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Returns a single <a href="#basics">post object</a>.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postId</code></td><td>yes</td><td>Post ID</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "post": { "id": "26.1789611603", "text": "...", ... } }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Post ID required</td></tr>
+                            <tr><td>404</td><td>Post not found</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="getMyPosts">
+                        <h3>getMyPosts</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Your posts, newest first. <code>totalCount</code> is the total across all pages. <code>hasMore</code> tells you whether to request the next page.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>offset</code></td><td>no</td><td>Posts to skip (default 0)</td></tr>
+                            <tr><td><code>limit</code></td><td>no</td><td>Posts to return (default 25)</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "posts": [ ... ], "hasMore": true, "totalCount": 42 }</code></pre>
+                    </div>
+
+                    <div class="endpoint" id="getUserPosts">
+                        <h3>getUserPosts</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>A user's posts, newest first. The response format is the same as <code>getMyPosts</code>.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>userId</code></td><td>yes</td><td>User ID</td></tr>
+                            <tr><td><code>offset</code></td><td>no</td><td>Posts to skip (default 0)</td></tr>
+                            <tr><td><code>limit</code></td><td>no</td><td>Posts to return (default 25)</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "posts": [ ... ], "hasMore": false, "totalCount": 1 }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Invalid user ID</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="fetchFollowedPosts">
+                        <h3>fetchFollowedPosts</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Your news feed: posts from everyone you follow plus your own, newest first. The response format is the same as <code>getMyPosts</code>.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>offset</code></td><td>no</td><td>Posts to skip (default 0)</td></tr>
+                            <tr><td><code>limit</code></td><td>no</td><td>Posts to return (default 25)</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "posts": [ ... ], "hasMore": true, "totalCount": 130 }</code></pre>
+                    </div>
+
+                    <div class="endpoint" id="getPostPreviews">
+                        <h3>getPostPreviews</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Short previews for a list of posts: the first 25 characters of each post's text followed by <code>...</code>. Posts that don't exist or have no text are left out.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postIds</code></td><td>yes</td><td>JSON array of post IDs</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "previews": { "26.1789611603": "Testing the new interactiv..." } }</code></pre>
+                    </div>
+
+                    <!-- ============== LIKES ============== -->
+                    <h2 id="likes">Likes</h2>
+
+                    <div class="endpoint" id="likePost">
+                        <h3>likePost</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Likes a post and notifies its owner. Liking a post you already liked does nothing.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postId</code></td><td>yes</td><td>Post ID</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "liked": true }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing post ID</td></tr>
+                            <tr><td>400</td><td>Cannot like your own post</td></tr>
+                            <tr><td>404</td><td>Post owner not found</td></tr>
+                            <tr><td>404</td><td>Post not found</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="unlikePost">
+                        <h3>unlikePost</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Removes your like from a post.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postId</code></td><td>yes</td><td>Post ID</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "liked": false }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing post ID</td></tr>
+                            <tr><td>404</td><td>Post owner not found</td></tr>
+                            <tr><td>404</td><td>Post not found</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="getPostLikes">
+                        <h3>getPostLikes</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Who liked a post. Use <a href="#getUserEmails"><code>getUserEmails</code></a> to look up their emails.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postId</code></td><td>yes</td><td>Post ID</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "likes": [ { "userId": 1, "timestamp": "2026-09-16 19:43:02" } ] }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing post ID</td></tr>
+                            <tr><td>404</td><td>Post not found</td></tr>
+                        </table>
+                    </div>
+
+                    <!-- ============== COMMENTS ============== -->
+                    <h2 id="comments">Comments</h2>
+
+                    <div class="endpoint" id="createComment">
+                        <h3>createComment</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Adds a comment and notifies the post owner. <code>commentId</code> is returned as a string.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postId</code></td><td>yes</td><td>Post ID</td></tr>
+                            <tr><td><code>text</code></td><td>yes</td><td>Comment text (up to 5000 characters, see <a href="#basics">text limits</a>)</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "commentId": "64" }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing post ID</td></tr>
+                            <tr><td>400</td><td>Comment text required</td></tr>
+                            <tr><td>400</td><td>Comment too long (max 5000 chars)</td></tr>
+                            <tr><td>400</td><td>Illegal characters in comment</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="getPostComments">
+                        <h3>getPostComments</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>A post's comments, newest first.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postId</code></td><td>yes</td><td>Post ID</td></tr>
+                            <tr><td><code>offset</code></td><td>no</td><td>Comments to skip (default 0)</td></tr>
+                            <tr><td><code>limit</code></td><td>no</td><td>Comments to return (default 25)</td></tr>
+                        </table>
+                        <pre><code>{
+  "valid": true,
+  "comments": [
+    {
+      "id": 64,
+      "post_id": "26.1789611751",
+      "user_id": 26,
+      "text": "Test comment",
+      "created_at": "2026-09-16 19:22:39",
+      "user_email": "davefruin@gmail.com"
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 1
+}</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing post ID</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="deleteComment">
+                        <h3>deleteComment</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Deletes one of your comments.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>commentId</code></td><td>yes</td><td>Comment ID</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "deleted": true }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing comment ID</td></tr>
+                            <tr><td>403</td><td>Can only delete your own comments</td></tr>
+                            <tr><td>404</td><td>Comment not found</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="getPostCommentCounts">
+                        <h3>getPostCommentCounts</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Comment counts for a list of posts, keyed by post ID.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>postIds</code></td><td>yes</td><td>JSON array of post IDs</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "counts": { "26.1789611603": 0, "8.1": 3 } }</code></pre>
+                    </div>
+
+                    <!-- ============== FOLLOWS ============== -->
+                    <h2 id="follows">Follows</h2>
+
+                    <div class="endpoint" id="followUser">
+                        <h3>followUser</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Follows a user and notifies them. Following someone you already follow does nothing.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>userId</code></td><td>yes</td><td>User to follow (not yourself)</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "following": true }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Invalid user ID</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="unfollowUser">
+                        <h3>unfollowUser</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Unfollows a user and notifies them.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>userId</code></td><td>yes</td><td>User to unfollow (not yourself)</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "following": false }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Invalid user ID</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="isFollowing">
+                        <h3>isFollowing</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Whether you follow a user.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>userId</code></td><td>yes</td><td>User ID (not yourself)</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "following": true }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Invalid user ID</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="getMyFollows">
+                        <h3>getMyFollows</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Who a user follows, defaulting to you. <code>timestamp</code> is when they followed, or <code>"Unknown"</code> for very old follows.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>userId</code></td><td>no</td><td>User ID (default: you)</td></tr>
+                        </table>
+                        <pre><code>{
+  "valid": true,
+  "follows": [
+    { "id": 8, "email": "annabegomez@gmail.com", "timestamp": "2026-04-13 22:54:31" }
+  ]
+}</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Invalid user ID</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="getMyFollowers">
+                        <h3>getMyFollowers</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Who follows a user, defaulting to you. Entries have the same format as <code>getMyFollows</code>.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>userId</code></td><td>no</td><td>User ID (default: you)</td></tr>
+                        </table>
+                        <pre><code>{
+  "valid": true,
+  "followers": [
+    { "id": 1, "email": "me@davidfruin.com", "timestamp": "2026-04-27 14:41:50" }
+  ]
+}</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Invalid user ID</td></tr>
+                        </table>
+                    </div>
+
+                    <!-- ============== NOTIFICATIONS ============== -->
+                    <h2 id="notifications">Notifications</h2>
+
+                    <div class="endpoint" id="getNotifications">
+                        <h3>getNotifications</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Your notifications, newest first, 25 at a time. Request the next page with <code>offset</code> until fewer than 25 come back. <code>type</code> is one of <code>follow</code>, <code>unfollow</code>, <code>like</code>, <code>unlike</code>, or <code>comment</code>. <code>post_id</code> is <code>null</code> for follow notifications.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>offset</code></td><td>no</td><td>Notifications to skip (default 0)</td></tr>
+                        </table>
+                        <pre><code>{
+  "valid": true,
+  "notifications": [
+    {
+      "id": 120,
+      "recipient_id": 26,
+      "actor_id": 1,
+      "actor_email": "me@davidfruin.com",
+      "type": "like",
+      "post_id": "26.1789611603",
+      "created_at": "2026-09-16 19:43:02"
+    }
+  ]
+}</code></pre>
+                    </div>
+
+                    <div class="endpoint" id="getUnseenNotificationCount">
+                        <h3>getUnseenNotificationCount</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>How many notifications arrived since you last called <code>markNotificationsSeen</code>.</p>
+                        <pre><code>{ "valid": true, "count": 3 }</code></pre>
+                    </div>
+
+                    <div class="endpoint" id="markNotificationsSeen">
+                        <h3>markNotificationsSeen</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Resets your unseen notification count to zero.</p>
+                        <pre><code>{ "valid": true, "message": "Notifications marked as seen" }</code></pre>
+                    </div>
+
+                    <!-- ============== MEDIA ============== -->
+                    <h2 id="media">Media</h2>
+
+                    <div class="endpoint" id="uploadMedia">
+                        <h3>uploadMedia</h3>
+                        <p class="endpoint-meta">POST /media.php &middot; multipart/form-data &middot; Auth: required</p>
+                        <p>Uploads a file to attach to a post. Pass the returned <code>mediaUrl</code> to <a href="#post"><code>post</code></a>. Images are converted to WebP and scaled down to fit within 1920&times;1080. <code>mediaId</code> is returned as a string.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>action</code></td><td>yes</td><td><code>uploadMedia</code></td></tr>
+                            <tr><td><code>file</code></td><td>yes</td><td>The file to upload</td></tr>
+                        </table>
+                        <div class="table-scroll">
+                        <table>
+                            <tr><th>Type</th><th>Accepted formats</th><th>Max size</th></tr>
+                            <tr><td>image</td><td>JPEG, PNG, GIF, WebP</td><td>10 MB</td></tr>
+                            <tr><td>video</td><td>MOV, MP4, M4V, WebM</td><td>100 MB</td></tr>
+                            <tr><td>audio</td><td>WAV, MP3, WebM</td><td>50 MB</td></tr>
+                        </table>
+                        </div>
+                        <pre><code>{
+  "valid": true,
+  "mediaId": "12",
+  "mediaUrl": "/media/26/image/26_image_20260916192002_591227.webp",
+  "thumbnailUrl": null,
+  "type": "image"
+}</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>No file uploaded</td></tr>
+                            <tr><td>400</td><td>Invalid file type. Allowed: jpg, png, gif, webp, mov, mp4, m4v, wav, mp3</td></tr>
+                            <tr><td>400</td><td>File too large. Max: 10 MB (or 100 / 50 for video / audio)</td></tr>
+                            <tr><td>500</td><td>Failed to process upload</td></tr>
+                            <tr><td>500</td><td>Failed to process image / video / audio</td></tr>
+                        </table>
+                    </div>
+
+                    <div class="endpoint" id="deleteMedia">
+                        <h3>deleteMedia</h3>
+                        <p class="endpoint-meta">POST /media.php &middot; Auth: required</p>
+                        <p>Deletes a file you uploaded, for example if creating the post failed. Deleting a post already deletes its media.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>action</code></td><td>yes</td><td><code>deleteMedia</code></td></tr>
+                            <tr><td><code>mediaId</code></td><td>yes</td><td>ID returned by <code>uploadMedia</code></td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "deleted": true }</code></pre>
+                        <table>
+                            <tr><th>Status</th><th>message</th></tr>
+                            <tr><td>400</td><td>Missing mediaId</td></tr>
+                            <tr><td>404</td><td>Media not found</td></tr>
+                        </table>
+                    </div>
+
+                    <!-- ============== INTERNAL ============== -->
+                    <h2 id="internal">Internal</h2>
+
+                    <div class="endpoint" id="log">
+                        <h3>log</h3>
+                        <p class="endpoint-meta">POST /api.php &middot; Auth: required</p>
+                        <p>Used by the website to report client-side errors. Third-party front ends don't need it.</p>
+                        <table>
+                            <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+                            <tr><td><code>level</code></td><td>no</td><td><code>DEBUG</code>, <code>INFO</code>, <code>WARN</code>, or <code>ERROR</code> (default)</td></tr>
+                            <tr><td><code>category</code></td><td>no</td><td><code>frontend</code> (default), <code>api</code>, <code>access</code>, or <code>php</code></td></tr>
+                            <tr><td><code>message</code></td><td>no</td><td>Log message</td></tr>
+                            <tr><td><code>extra</code></td><td>no</td><td>Extra details</td></tr>
+                        </table>
+                        <pre><code>{ "valid": true, "message": "Logged" }</code></pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <footer>
+            <p>&copy; 2026 Simple Social</p>
+        </footer>
+    </div>
+</body>
+</html>
