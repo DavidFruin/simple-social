@@ -157,6 +157,7 @@ const CreatePostPage = {
     
     selectMediaBtn.disabled = true;
     status.textContent = 'Uploading...';
+    this.renderMediaUploading(file.type.split('/')[0] || 'media');
 
     try {
       const isImage = file.type.startsWith('image/');
@@ -251,6 +252,21 @@ const CreatePostPage = {
       status.textContent = 'Rotate failed';
       if (rotateBtn) rotateBtn.disabled = false;
     }
+  },
+
+  // Stands in for the media until it's ready. The wait covers the upload and
+  // the server's ffmpeg conversion, so on a long recording it's several
+  // seconds with nothing else to show for it.
+  renderMediaUploading(label) {
+    const preview = document.getElementById('media-preview');
+    if (!preview) return;
+
+    preview.innerHTML = `
+      <div class="media-preview-loading">
+        <span class="spinner"></span>
+        <span>Uploading ${escapeHtml(label)}&hellip;</span>
+      </div>
+    `;
   },
 
   renderMediaPreview(mediaData) {
@@ -686,12 +702,16 @@ const CreatePostPage = {
       const blob = new Blob(this.recordedChunks, { type: mimeType });
       const file = new File([blob], `${type}_${Date.now()}.${extension}`, { type: mimeType });
 
+      // Closed before the upload rather than after: the modal covers the
+      // page, so while it's up there's no sign of the upload or the server's
+      // conversion happening behind it.
+      this.closeCaptureModal();
+      this.renderMediaUploading(type);
       status.textContent = `Uploading ${type}...`;
 
       this.originalImage = null;
       await this.uploadAndReplace(file);
 
-      this.closeCaptureModal();
       this.clearMediaInput();
 
       status.textContent = type.charAt(0).toUpperCase() + type.slice(1) + ' recorded!';
@@ -701,6 +721,7 @@ const CreatePostPage = {
       console.error('Error processing recording:', err);
       showError(err.message);
       status.textContent = 'Upload failed';
+      this.clearMedia();
       selectMediaBtn.disabled = false;
     }
   },

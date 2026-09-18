@@ -1370,6 +1370,32 @@ footer {
   border-radius: var(--border-radius);
 }
 
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spinner-rotate 0.7s linear infinite;
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+.media-preview-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
 .media-preview-item img,
 .media-preview-item video {
   max-width: 100%;
