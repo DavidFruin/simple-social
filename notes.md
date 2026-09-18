@@ -17,7 +17,6 @@ have to have a referal code to register account maybe?
 tagging people in posts and comments
 
 STYLE BUGS
-Rounded edges on images and videos unless they are vertical then they don't get rounded corners
 back button on an expanded post is too hard to tap on a phone
 theme doesn't change the background of text input fields
 
