@@ -145,7 +145,8 @@ function renderThumbNav() {
 
 // Updates every badge on the page: the header nav's, and the one on the
 // thumb bubble that stands in for it on touch devices, where the header nav
-// is hidden.
+// is hidden. Also sets the PWA's home-screen icon badge, for when the app
+// isn't even open -- unsupported browsers just no-op the call.
 function updateNotificationBadge() {
   const count = Store.getNotificationCount();
 
@@ -153,6 +154,14 @@ function updateNotificationBadge() {
     badge.textContent = count > 99 ? '99+' : count;
     badge.classList.toggle('hidden', count === 0);
   });
+
+  if ('setAppBadge' in navigator) {
+    if (count > 0) {
+      navigator.setAppBadge(count).catch(() => {});
+    } else {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  }
 }
 
 async function handleLogout(e) {
