@@ -9,10 +9,12 @@ RULES: keep the cli, tui, api backend, web frontend, ios frontend and android fr
 
 FEATURES
 media capture should be three buttons: picture, video, audio
-add a loading spinner in various places
+make spinner loading for homescreen of app on initial load and for media uploading and posts loading on a page
 allow links in post text
 better video controls
 show the list of allowed characters on the post page
+notifications when someone comments on a post that you've commented on
+change the style and color of the theme selector
 
 FUTURE IDEAS
 have to have a referal code to register account maybe?
@@ -23,6 +25,8 @@ STYLE BUGS
 back button on an expanded post is too hard to tap on a phone
 on phone view put the controls lower on the page on the create post page
 theme doesn't change the background of text input fields
+can't see all the playback speed options when you open the selector
+success and error messages should be slightly higher up on page in phone view
 
 BUGS
 low importance: after posting, the feed doesn't show your own new post for a second -- had to reload the feed to see it
