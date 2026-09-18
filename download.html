@@ -78,7 +78,27 @@
                     <p>Then run it with <code>./simple-social-cli-interactive</code> from inside that folder.</p>
 
                     <h2>TUI</h2>
-                    <p>A full-screen terminal interface. Installation instructions are coming soon.</p>
+                    <p>A full-screen terminal interface you navigate with the keyboard. It's a separate program that uses the CLI above, so build the CLI first, then run these from the <strong>same folder</strong> you ran the CLI's <code>git clone</code> in (not inside the <code>simple-social-cli</code> folder). Debian and Ubuntu only for now, same as the CLI.</p>
+
+                    <p>1. Install ncurses:</p>
+                    <div class="code-block">
+                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y libncurses-dev</code></pre>
+                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y libncurses-dev">Copy</button>
+                    </div>
+
+                    <p>2. Clone the repo:</p>
+                    <div class="code-block">
+                        <pre><code>git clone https://github.com/DavidFruin/simple-social-tui.git</code></pre>
+                        <button class="copy-btn" data-copy="git clone https://github.com/DavidFruin/simple-social-tui.git">Copy</button>
+                    </div>
+
+                    <p>3. Build it:</p>
+                    <div class="code-block">
+                        <pre><code>cd simple-social-tui &amp;&amp; make</code></pre>
+                        <button class="copy-btn" data-copy="cd simple-social-tui && make">Copy</button>
+                    </div>
+
+                    <p>Then run it with <code>./simple-social-tui</code> from inside that folder. If you're already logged in from the CLI or Interactive CLI, it opens straight to your feed &mdash; all three tools share the same session. Otherwise you'll land on a login screen where you can log in, register, or reset a forgotten password.</p>
                 </div>
             </div>
         </main>
