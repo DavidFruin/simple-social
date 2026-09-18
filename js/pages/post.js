@@ -33,7 +33,7 @@ const PostPage = {
 
     container.innerHTML = `
       <div class="page-container">
-        <a href="javascript:void(0)" class="back-link" id="back-link">← Back</a>
+        <button type="button" class="btn btn-secondary back-link" id="back-link">← Back</button>
 
         <div id="post-container">
           ${cached ? '' : '<div class="loading">Loading post...</div>'}
