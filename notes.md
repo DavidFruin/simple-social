@@ -21,7 +21,7 @@ language switcher
 
 STYLE BUGS
 back button on an expanded post is too hard to tap on a phone
-on phone view put the controls lower on the page on the post page
+on phone view put the controls lower on the page on the create post page
 theme doesn't change the background of text input fields
 
 BUGS
