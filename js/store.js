@@ -102,7 +102,17 @@ const Store = {
 
   setNotificationCount(count) {
     this.state.notificationCount = count;
+    this.notificationCountLoaded = true;
     this.notify('notificationCount');
+  },
+
+  // The count starts at 0 only because we haven't asked the server yet -- that
+  // is not the same as "you have no notifications". The home-screen badge
+  // outlives the page, so it must not be cleared on that assumption.
+  notificationCountLoaded: false,
+
+  isNotificationCountLoaded() {
+    return this.notificationCountLoaded;
   },
 
   getNotificationCount() {
@@ -118,6 +128,8 @@ const Store = {
     this.state.jwt = null;
     this.state.user = null;
     this.state.notificationCount = 0;
+    // Logged out is a real zero, not an unknown, so the badge should clear.
+    this.notificationCountLoaded = true;
     localStorage.removeItem(this.JWT_KEY);
     localStorage.removeItem(this.USER_KEY);
     api.clearJwt();

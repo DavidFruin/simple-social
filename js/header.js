@@ -155,7 +155,10 @@ function updateNotificationBadge() {
     badge.classList.toggle('hidden', count === 0);
   });
 
-  if ('setAppBadge' in navigator) {
+  // Only touch the home-screen badge once the count is actually known.
+  // Otherwise every app launch would clear it before the first poll returns,
+  // making the number vanish without anyone hitting "Mark as Seen".
+  if ('setAppBadge' in navigator && Store.isNotificationCountLoaded()) {
     if (count > 0) {
       navigator.setAppBadge(count).catch(() => {});
     } else {
