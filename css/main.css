@@ -888,6 +888,12 @@ footer {
   margin-bottom: var(--spacing-lg);
 }
 
+.settings-note {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: var(--spacing-md);
+}
+
 .settings-links {
   list-style: none;
   display: flex;

@@ -2,6 +2,7 @@
 // api.php - Simple Social API (max 3 levels indentation)
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/logging.php';
+require_once __DIR__ . '/webpush.php';
 
 ob_start();
 ini_set('display_errors', 0);
@@ -82,6 +83,14 @@ function db() {
     $pdo->exec('CREATE TABLE IF NOT EXISTS media (
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
         filename TEXT NOT NULL, type TEXT NOT NULL, path TEXT NOT NULL, created_at TEXT NOT NULL, post_id TEXT)');
+    // One row per browser/device a user has enabled push on. endpoint is
+    // unique so re-subscribing the same browser replaces its row instead of
+    // piling up duplicates.
+    $pdo->exec('CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+        endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL,
+        created_at TEXT NOT NULL)');
+    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)');
     try {
         $cols = $pdo->query("PRAGMA table_info(media)")->fetchAll(PDO::FETCH_ASSOC);
         $hasPostId = false;
@@ -171,6 +180,70 @@ function bad($msg, $code = 400) {
 
 function good($data = []) {
     return array_merge(['valid' => true], $data);
+}
+
+// ============== NOTIFICATIONS ==============
+// The one place a notification gets created: writes the row the bell icon
+// reads, then pushes it to whatever devices the recipient has enabled push
+// on. Push failures are swallowed -- a dead subscription must never break
+// the like/comment/follow that triggered it.
+function createNotification($pdo, $recipientId, $actorId, $actorEmail, $type, $postId = null) {
+    $now = date('Y-m-d H:i:s');
+    if ($postId === null) {
+        $stmt = $pdo->prepare('INSERT INTO notifications (recipient_id, actor_id, actor_email, type, created_at) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute([$recipientId, $actorId, $actorEmail, $type, $now]);
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO notifications (recipient_id, actor_id, actor_email, type, post_id, created_at) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$recipientId, $actorId, $actorEmail, $type, $postId, $now]);
+    }
+
+    try {
+        pushNotification($pdo, $recipientId, $actorEmail, $type, $postId, $actorId);
+    } catch (Exception $e) {
+        logMsg("push failed: " . $e->getMessage());
+    } catch (Error $e) {
+        logMsg("push failed: " . $e->getMessage());
+    }
+}
+
+function notificationText($actorEmail, $type) {
+    $name = explode('@', $actorEmail)[0];
+    switch ($type) {
+        case 'like': return "$name liked your post";
+        case 'unlike': return "$name unliked your post";
+        case 'comment': return "$name commented on your post";
+        case 'follow': return "$name started following you";
+        case 'unfollow': return "$name unfollowed you";
+    }
+    return "$name did something";
+}
+
+function pushNotification($pdo, $recipientId, $actorEmail, $type, $postId, $actorId) {
+    global $CONFIG;
+    if (empty($CONFIG['vapid_public']) || empty($CONFIG['vapid_private'])) return;
+
+    $stmt = $pdo->prepare('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?');
+    $stmt->execute([$recipientId]);
+    $subscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!$subscriptions) return;
+
+    $url = $postId ? "/app.html#/post/$postId" : "/app.html#/profile/$actorId";
+    $payload = [
+        'title' => 'Simple Social',
+        'body' => notificationText($actorEmail, $type),
+        'url' => $url,
+    ];
+    $subject = $CONFIG['vapid_subject'] ?? 'noreply@davidfruin.com';
+
+    foreach ($subscriptions as $sub) {
+        $status = sendWebPush($sub, $payload, $subject);
+        logMsg("push to user $recipientId status=$status");
+        // The push service says this subscription no longer exists.
+        if ($status === 404 || $status === 410) {
+            $del = $pdo->prepare('DELETE FROM push_subscriptions WHERE endpoint = ?');
+            $del->execute([$sub['endpoint']]);
+        }
+    }
 }
 
 // Stored in place of an OTP once it has been verified. It can never match a
@@ -756,6 +829,32 @@ function handle_updateTheme($pdo, $user) {
     respond(good(['message' => 'Theme updated']));
 }
 
+function handle_getVapidPublicKey($pdo, $user) {
+    global $CONFIG;
+    respond(good(['key' => $CONFIG['vapid_public'] ?? '']));
+}
+
+function handle_savePushSubscription($pdo, $user) {
+    $endpoint = trim($_POST['endpoint'] ?? '');
+    $p256dh = trim($_POST['p256dh'] ?? '');
+    $auth = trim($_POST['auth'] ?? '');
+    if (!$endpoint || !$p256dh || !$auth) bad('Missing subscription details', 400);
+    if (!filter_var($endpoint, FILTER_VALIDATE_URL)) bad('Invalid endpoint', 400);
+
+    $stmt = $pdo->prepare('INSERT OR REPLACE INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)');
+    $stmt->execute([$user['sub'], $endpoint, $p256dh, $auth, date('Y-m-d H:i:s')]);
+    respond(good(['message' => 'Push enabled']));
+}
+
+function handle_deletePushSubscription($pdo, $user) {
+    $endpoint = trim($_POST['endpoint'] ?? '');
+    if (!$endpoint) bad('Missing endpoint', 400);
+
+    $stmt = $pdo->prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?');
+    $stmt->execute([$endpoint, $user['sub']]);
+    respond(good(['message' => 'Push disabled']));
+}
+
 function handle_updateHand($pdo, $user) {
     $hand = $_POST['hand'] ?? '';
     if (!in_array($hand, ['left', 'right'], true)) bad('Invalid hand', 400);
@@ -838,8 +937,7 @@ function handle_likePost($pdo, $user) {
             if (!$alreadyLiked) {
                 $post['likes'][] = ['userId' => $user['sub'], 'timestamp' => date('Y-m-d H:i:s')];
                 if ($ownerId != $user['sub']) {
-                    $stmt = $pdo->prepare('INSERT INTO notifications (recipient_id, actor_id, actor_email, type, post_id, created_at) VALUES (?, ?, ?, ?, ?, ?)');
-                    $stmt->execute([$ownerId, $user['sub'], $actorEmail, 'like', $postId, date('Y-m-d H:i:s')]);
+                    createNotification($pdo, $ownerId, $user['sub'], $actorEmail, 'like', $postId);
                 }
             }
             break;
@@ -883,8 +981,7 @@ function handle_unlikePost($pdo, $user) {
                 $post['likes'] = array_values($post['likes']);
                 $wasLiked = count($post['likes']) < $before;
                 if ($wasLiked && $ownerId != $user['sub']) {
-                    $stmt = $pdo->prepare('INSERT INTO notifications (recipient_id, actor_id, actor_email, type, post_id, created_at) VALUES (?, ?, ?, ?, ?, ?)');
-                    $stmt->execute([$ownerId, $user['sub'], $actorEmail, 'unlike', $postId, date('Y-m-d H:i:s')]);
+                    createNotification($pdo, $ownerId, $user['sub'], $actorEmail, 'unlike', $postId);
                 }
             }
             break;
@@ -938,8 +1035,7 @@ function handle_followUser($pdo, $user) {
         $follows[] = ['id' => $targetId, 'timestamp' => date('Y-m-d H:i:s')];
         $stmt = $pdo->prepare('UPDATE users SET follows = ? WHERE id = ?');
         $stmt->execute([json_encode($follows), $uid]);
-        $stmt = $pdo->prepare('INSERT INTO notifications (recipient_id, actor_id, actor_email, type, created_at) VALUES (?, ?, ?, ?, ?)');
-        $stmt->execute([$targetId, $uid, $actorEmail, 'follow', date('Y-m-d H:i:s')]);
+        createNotification($pdo, $targetId, $uid, $actorEmail, 'follow');
     }
 
     respond(good(['following' => true]));
@@ -962,8 +1058,7 @@ function handle_unfollowUser($pdo, $user) {
     $stmt = $pdo->prepare('UPDATE users SET follows = ? WHERE id = ?');
     $stmt->execute([json_encode($follows), $uid]);
 
-    $stmt = $pdo->prepare('INSERT INTO notifications (recipient_id, actor_id, actor_email, type, created_at) VALUES (?, ?, ?, ?, ?)');
-    $stmt->execute([$targetId, $uid, $actorEmail, 'unfollow', date('Y-m-d H:i:s')]);
+    createNotification($pdo, $targetId, $uid, $actorEmail, 'unfollow');
 
     respond(good(['following' => false]));
 }
@@ -1052,8 +1147,7 @@ function handle_createComment($pdo, $user) {
         $stmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
         $stmt->execute([$user['sub']]);
         $actorEmail = $stmt->fetchColumn();
-        $stmt = $pdo->prepare('INSERT INTO notifications (recipient_id, actor_id, actor_email, type, post_id, created_at) VALUES (?, ?, ?, ?, ?, ?)');
-        $stmt->execute([$ownerId, $user['sub'], $actorEmail, 'comment', $postId, date('Y-m-d H:i:s')]);
+        createNotification($pdo, $ownerId, $user['sub'], $actorEmail, 'comment', $postId);
     }
 
     respond(good(['commentId' => $commentId]));
@@ -1130,6 +1224,9 @@ $HANDLERS = [
     'markNotificationsSeen' => 'handle_markNotificationsSeen', 'getPostById' => 'handle_getPostById',
     'getPostPreviews' => 'handle_getPostPreviews',
     'updateTheme' => 'handle_updateTheme', 'updateHand' => 'handle_updateHand',
+    'getVapidPublicKey' => 'handle_getVapidPublicKey',
+    'savePushSubscription' => 'handle_savePushSubscription',
+    'deletePushSubscription' => 'handle_deletePushSubscription',
     'log' => 'handle_log_request'
 ];
 

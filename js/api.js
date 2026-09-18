@@ -148,6 +148,19 @@ const API = {
     return this.call('updateHand', { hand });
   },
 
+  // ============== PUSH ==============
+  async getVapidPublicKey() {
+    return this.call('getVapidPublicKey', {});
+  },
+
+  async savePushSubscription(endpoint, p256dh, auth) {
+    return this.call('savePushSubscription', { endpoint, p256dh, auth });
+  },
+
+  async deletePushSubscription(endpoint) {
+    return this.call('deletePushSubscription', { endpoint });
+  },
+
   // ============== POSTS ==============
   async post(postText, mediaUrl = null) {
     return this.call('post', { postText, mediaUrl });

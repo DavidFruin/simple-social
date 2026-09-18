@@ -29,6 +29,12 @@ const SettingsPage = {
         </div>
 
         <div class="settings-section">
+          <h2>Notifications</h2>
+          <p id="push-status" class="settings-note">Checking...</p>
+          <button type="button" id="push-btn" class="btn btn-primary hidden"></button>
+        </div>
+
+        <div class="settings-section">
           <h2>Info</h2>
           <ul class="settings-links">
             <li><a href="/about.html">About</a></li>
@@ -66,6 +72,95 @@ const SettingsPage = {
       handToggle.checked = Store.getHand() === 'right';
       handToggle.addEventListener('change', this.handleHandChange.bind(this));
     }
+
+    this.initPushSection();
+  },
+
+  // Push is per-device, not per-account: whether it's on depends on this
+  // browser's own subscription, so it's read from the service worker rather
+  // than from the user record.
+  async initPushSection() {
+    const statusEl = document.getElementById('push-status');
+    const btn = document.getElementById('push-btn');
+    if (!statusEl || !btn) return;
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      statusEl.textContent = "This browser doesn't support push notifications.";
+      return;
+    }
+
+    if (Notification.permission === 'denied') {
+      statusEl.textContent = 'Notifications are blocked for this site in your browser settings.';
+      return;
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    this.renderPushState(!!subscription);
+    btn.addEventListener('click', this.handlePushClick.bind(this));
+  },
+
+  renderPushState(enabled) {
+    const statusEl = document.getElementById('push-status');
+    const btn = document.getElementById('push-btn');
+    if (!statusEl || !btn) return;
+
+    statusEl.textContent = enabled
+      ? 'Push notifications are on for this device.'
+      : 'Get notified on this device when someone likes, comments on, or follows you.';
+    btn.textContent = enabled ? 'Turn off' : 'Turn on';
+    btn.dataset.enabled = enabled ? 'true' : 'false';
+    btn.classList.remove('hidden');
+  },
+
+  async handlePushClick(e) {
+    const btn = e.currentTarget;
+    const wasEnabled = btn.dataset.enabled === 'true';
+    btn.disabled = true;
+
+    try {
+      if (wasEnabled) {
+        await this.disablePush();
+        this.renderPushState(false);
+        showSuccess('Push notifications turned off');
+      } else {
+        await this.enablePush();
+        this.renderPushState(true);
+        showSuccess('Push notifications turned on');
+      }
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  },
+
+  async enablePush() {
+    // Must be the first await in the click's call chain -- browsers only
+    // allow the permission prompt while still inside the user gesture.
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') throw new Error('Notification permission was not granted');
+
+    const result = await api.getVapidPublicKey();
+    if (!result.key) throw new Error('Push notifications are not configured on the server yet');
+
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(result.key)
+    });
+
+    const keys = subscription.toJSON().keys;
+    await api.savePushSubscription(subscription.endpoint, keys.p256dh, keys.auth);
+  },
+
+  async disablePush() {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) return;
+
+    await api.deletePushSubscription(subscription.endpoint);
+    await subscription.unsubscribe();
   },
 
   async handleThemeChange(e) {
@@ -131,5 +226,15 @@ const SettingsPage = {
     }
   }
 };
+
+// pushManager.subscribe() wants the VAPID key as raw bytes, not base64url.
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
+  return output;
+}
 
 window.SettingsPage = SettingsPage;

@@ -38,6 +38,9 @@ if ($envSecret !== '') {
     $CONFIG['jwt_secret'] = null;
 }
 
+$CONFIG['vapid_public'] = getenv('VAPID_PUBLIC_KEY') ?: ($_ENV['VAPID_PUBLIC_KEY'] ?? null);
+$CONFIG['vapid_private'] = getenv('VAPID_PRIVATE_KEY') ?: ($_ENV['VAPID_PRIVATE_KEY'] ?? null);
+
 $privateDb = dirname(__DIR__) . '/private/userdata.db';
 $privateLogs = dirname(__DIR__) . '/private/logs';
 if (file_exists($privateDb) || is_dir(dirname($privateDb))) {
