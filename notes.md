@@ -11,6 +11,7 @@ FEATURES
 media capture should be three buttons: picture, video, audio
 add a loading spinner in various places
 allow links in post text
+better video controls
 
 FUTURE IDEAS
 have to have a referal code to register account maybe?
