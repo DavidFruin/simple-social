@@ -45,6 +45,7 @@ function renderHeader() {
   }
 
   renderThumbNav();
+  renderScrollTopButton();
   // After both, since each one draws its own badge. Only reflects whatever
   // count Store already has -- actually fetching it is startNotificationCheck()'s
   // job (called once on load, then every 60s), not something to redo on
@@ -147,6 +148,38 @@ function renderThumbNav() {
 // thumb bubble that stands in for it on touch devices, where the header nav
 // is hidden. Also sets the PWA's home-screen icon badge, for when the app
 // isn't even open -- unsupported browsers just no-op the call.
+// Floating "back to top" button. Takes the bottom corner opposite the thumb
+// bubble so the two can never overlap, which means it swaps sides along with
+// the hand setting. Shown only once there's enough page above you to bother.
+const SCROLL_TOP_THRESHOLD = 400;
+
+function renderScrollTopButton() {
+  let btn = document.getElementById('scroll-top-btn');
+
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'scroll-top-btn';
+    btn.type = 'button';
+    btn.className = 'scroll-top-btn';
+    btn.setAttribute('aria-label', 'Scroll to top');
+    btn.textContent = '↑';
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    document.body.appendChild(btn);
+
+    window.addEventListener('scroll', updateScrollTopButton, { passive: true });
+  }
+
+  btn.classList.toggle('scroll-top-right', Store.getHand() === 'left');
+  updateScrollTopButton();
+}
+
+function updateScrollTopButton() {
+  const btn = document.getElementById('scroll-top-btn');
+  if (!btn) return;
+
+  btn.classList.toggle('visible', window.scrollY > SCROLL_TOP_THRESHOLD);
+}
+
 function updateNotificationBadge() {
   const count = Store.getNotificationCount();
 
