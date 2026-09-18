@@ -9,6 +9,7 @@ const MediaViewer = {
     this.overlay.innerHTML = `
       <button class="media-viewer-close" onclick="MediaViewer.close()">×</button>
       <button class="media-viewer-fullscreen" onclick="MediaViewer.toggleFullscreen()">⛶</button>
+      <a class="media-viewer-download" download title="Download" aria-label="Download">↓</a>
       <div class="media-viewer-content"></div>
     `;
     document.body.appendChild(this.overlay);
@@ -34,6 +35,9 @@ const MediaViewer = {
     if (!this.overlay) this.init();
 
     const content = this.overlay.querySelector('.media-viewer-content');
+    // Same-origin, so the download attribute saves the file rather than
+    // navigating to it.
+    this.overlay.querySelector('.media-viewer-download').href = url;
 
     if (type === 'image') {
       content.innerHTML = `<img src="${url}" alt="Media">`;

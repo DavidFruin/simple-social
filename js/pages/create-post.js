@@ -33,9 +33,12 @@ const CreatePostPage = {
             
             <div class="media-upload-section">
               <input type="file" id="media-input" accept="image/jpeg,image/png,image/gif,image/webp,video/quicktime,video/mp4,video/m4v,audio/wav,audio/mpeg,audio/mp3" style="display:none">
-              <button type="button" id="select-media-btn" class="btn btn-secondary">Upload Media</button>
-              <button type="button" id="capture-media-btn" class="btn btn-secondary">Capture Media</button>
-              <span id="media-status"></span>
+              <div class="media-upload-buttons">
+                <button type="button" id="select-media-btn" class="btn btn-secondary">Upload Media</button>
+                <button type="button" id="capture-media-btn" class="btn btn-secondary">Capture Media</button>
+              </div>
+              <p class="media-upload-note">One media file per post</p>
+              <span id="media-status" class="media-upload-status"></span>
             </div>
 
             <div id="capture-modal" class="capture-modal hidden">

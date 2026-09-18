@@ -1310,12 +1310,34 @@ footer {
 /* ============== MEDIA UPLOAD ============== */
 .media-upload-section {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   margin: var(--spacing-md) 0;
-  padding: var(--spacing-sm);
+  padding: var(--spacing-md);
   background: var(--color-bg-secondary);
   border-radius: var(--border-radius);
+}
+
+.media-upload-buttons {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.media-upload-note {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+/* Reserves its line so messages appearing and clearing don't shift the
+   buttons above them. */
+.media-upload-status {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  min-height: 1.25rem;
+  text-align: center;
 }
 
 .media-preview {
@@ -1531,6 +1553,29 @@ html.media-viewer-open body {
 }
 
 .media-viewer-fullscreen:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sits beside the fullscreen button, top-left. */
+.media-viewer-download {
+  position: absolute;
+  top: var(--spacing-md);
+  left: calc(var(--spacing-md) + 48px);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 22px;
+  text-decoration: none;
+  cursor: pointer;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-viewer-download:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
