@@ -835,6 +835,12 @@ footer {
   font-family: inherit;
 }
 
+.composer-note {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
 .composer-actions {
   display: flex;
   justify-content: space-between;

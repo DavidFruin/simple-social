@@ -28,7 +28,8 @@ const CreatePostPage = {
         <div class="composer">
           <form id="post-form">
             <textarea id="post-text" placeholder="What's on your mind?">${escapeHtml(draft)}</textarea>
-            
+            <p class="composer-note">Every post needs some text &mdash; media on its own isn't enough.</p>
+
             <div id="media-preview" class="media-preview"></div>
             
             <div class="media-upload-section">
