@@ -8,8 +8,6 @@ ALWAYS EASIER TO UNDERSTAND
 RULES: keep the cli, tui, api backend, web frontend, ios frontend and android frontend separate with only the interactive cli and tui built ontop of the cli.
 
 FEATURES
-the comments counter should expand the post too, same as the expand button
-add "scroll to top" button"
 media capture should be three buttons: picture, video, audio
 add a loading spinner in various places
 allow links in post text
