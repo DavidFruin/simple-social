@@ -1653,11 +1653,19 @@ html.media-viewer-open body {
   background: rgba(0, 0, 0, 0.8);
 }
 
-.capture-chooser {
+.capture-chooser-buttons {
   display: flex;
   gap: var(--spacing-sm);
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.capture-note {
+  margin-top: var(--spacing-md);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  text-align: center;
 }
 
 .capture-container {

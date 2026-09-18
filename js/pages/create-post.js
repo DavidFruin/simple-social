@@ -63,10 +63,13 @@ const CreatePostPage = {
                   <button type="button" class="capture-close" onclick="CreatePostPage.closeCaptureModal()">×</button>
                 </div>
 
-                <div id="capture-chooser" class="capture-chooser">
-                  <button type="button" id="choose-photo-btn" class="btn btn-secondary">Photo</button>
-                  <button type="button" id="choose-video-btn" class="btn btn-secondary">Video</button>
-                  <button type="button" id="choose-audio-btn" class="btn btn-secondary">Audio</button>
+                <div id="capture-chooser">
+                  <div class="capture-chooser-buttons">
+                    <button type="button" id="choose-photo-btn" class="btn btn-secondary">Photo</button>
+                    <button type="button" id="choose-video-btn" class="btn btn-secondary">Video</button>
+                    <button type="button" id="choose-audio-btn" class="btn btn-secondary">Audio</button>
+                  </div>
+                  <p class="capture-note">Capturing here gives lower resolution than your phone's own camera app or a real camera, because browsers only expose a limited set of camera modes. For the best quality, shoot in your camera app and use Upload Media instead.</p>
                 </div>
 
                 <div id="capture-stage" class="hidden">
