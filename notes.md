@@ -13,6 +13,7 @@ allow links in post text
 better video controls
 notifications when someone comments on a post that you've commented on
 change the style and color of the theme selector
+media limitations set in config file
 
 FUTURE IDEAS
 chat feature where people can talk to each other, including group chats
