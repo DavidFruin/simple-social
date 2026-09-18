@@ -8,13 +8,15 @@ ALWAYS EASIER TO UNDERSTAND
 RULES: keep the cli, tui, api backend, web frontend, ios frontend and android frontend separate with only the interactive cli and tui built ontop of the cli.
 
 FEATURES
-tagging people in posts and comments
 the comments counter should expand the post too, same as the expand button
-have to have a referal code to register account maybe?
 add "scroll to top" button"
 media capture should be three buttons: picture, video, audio
 add a loading spinner in various places
 allow links in post text
+
+FUTURE IDEAS
+have to have a referal code to register account maybe?
+tagging people in posts and comments
 
 STYLE BUGS
 Rounded edges on images and videos unless they are vertical then they don't get rounded corners
