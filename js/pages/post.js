@@ -20,6 +20,11 @@ const PostPage = {
     this.userId = parts[0];
     this.timestamp = parts[1];
     this.postId = postId;
+    // This object outlives a single visit, so last visit's comments are still
+    // here. renderPost() reads their count, and with a cached post it now
+    // runs before loadComments() returns -- which showed the previous post's
+    // comment count on the new one.
+    this.comments = [];
 
     // If we got here via "Expand" from feed/profile, that page's card already
     // handed us this exact post -- render it immediately instead of showing
