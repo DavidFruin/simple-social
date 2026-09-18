@@ -23,6 +23,15 @@ function createPostCard(post, options = {}) {
 
   const mediaHtml = createMediaHtml(post.mediaUrl);
 
+  // The comment count is a second way into the post, wherever expanding makes
+  // sense at all -- on the post's own page there's nowhere to go.
+  let commentCountHtml = '';
+  if (showCommentCount && showExpandLink) {
+    commentCountHtml = `<a href="#/post/${post.id}" class="comment-count">(${commentCount}) comments</a>`;
+  } else if (showCommentCount) {
+    commentCountHtml = `<span class="comment-count">(${commentCount}) comments</span>`;
+  }
+
   return `
     <div class="post-card" data-post-id="${post.id}">
       <div class="post-header">
@@ -42,7 +51,7 @@ function createPostCard(post, options = {}) {
           <div class="like-dropdown hidden" data-post-id="${post.id}"></div>` : `<span>${likeCount}</span>`}
         </div>
         ${showExpandLink ? `<a href="#/post/${post.id}" class="btn-expand">Expand</a>` : ''}
-        ${showCommentCount ? `<span class="comment-count">(${commentCount}) comments</span>` : ''}
+        ${commentCountHtml}
       </div>
     </div>
   `;

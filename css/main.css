@@ -474,6 +474,7 @@ footer {
 .comment-count {
   color: var(--color-text-secondary);
   font-size: 0.875rem;
+  text-decoration: none;
 }
 
 .like-section {
@@ -1076,6 +1077,40 @@ footer {
 
 .hand-toggle-input:checked ~ .hand-toggle-switch span {
   transform: translateX(24px);
+}
+
+/* ============== SCROLL TO TOP ============== */
+/* Bottom corner opposite the thumb bubble, so the two never overlap. Below
+   the bubble's z-index, above ordinary content. */
+.scroll-top-btn {
+  position: fixed;
+  bottom: 24px;
+  left: 20px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  font-size: 1.25rem;
+  line-height: 1;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 400;
+}
+
+.scroll-top-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Left-handed moves the bubble to this corner, so the button takes the other. */
+.scroll-top-btn.scroll-top-right {
+  left: auto;
+  right: 20px;
 }
 
 /* ============== THUMB NAV ============== */
