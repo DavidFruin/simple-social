@@ -16,6 +16,8 @@ change the style and color of the theme selector
 media limitations set in config file
 
 FUTURE IDEAS
+lock the site / log out all users for scheduled maintenance
+admin panel for freezing or deleting specific users because of abuse or such things
 chat feature where people can talk to each other, including group chats
 complaints and ideas page where people can report a bug, complain about a person, or suggest an idea for the app
 have to have a referal code to register account maybe?
