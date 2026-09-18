@@ -40,7 +40,7 @@ function createPostCard(post, options = {}) {
         ${isOwner ? `<button class="btn-delete-post" data-post-id="${post.id}">Delete</button>` : ''}
       </div>
       <div class="post-body">${escapeHtml(post.text)}</div>
-      <button type="button" class="post-show-more hidden">Show more</button>
+      <button type="button" class="btn btn-secondary post-show-more hidden">Show more</button>
       ${mediaHtml}
       <div class="post-footer">
         <div class="like-section">
@@ -50,7 +50,7 @@ function createPostCard(post, options = {}) {
           ${showLikeDropdown ? `<button class="btn-like-count" data-post-id="${post.id}">(${likeCount}) likes</button>
           <div class="like-dropdown hidden" data-post-id="${post.id}"></div>` : `<span>${likeCount}</span>`}
         </div>
-        ${showExpandLink ? `<a href="#/post/${post.id}" class="btn-expand">Expand</a>` : ''}
+        ${showExpandLink ? `<a href="#/post/${post.id}" class="btn btn-secondary btn-expand">Expand</a>` : ''}
         ${commentCountHtml}
       </div>
     </div>

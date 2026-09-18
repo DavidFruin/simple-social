@@ -430,19 +430,7 @@ footer {
 }
 
 .post-show-more {
-  display: block;
-  background: none;
-  border: none;
-  padding: 0;
-  margin: calc(-1 * var(--spacing-sm)) 0 var(--spacing-md);
-  color: var(--color-primary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.post-show-more:hover {
-  text-decoration: underline;
+  margin: var(--spacing-sm) 0;
 }
 
 .post-footer {
@@ -458,16 +446,6 @@ footer {
 }
 
 .btn-comments:hover {
-  color: var(--color-primary);
-}
-
-.btn-expand {
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  font-size: 0.875rem;
-}
-
-.btn-expand:hover {
   color: var(--color-primary);
 }
 
@@ -923,14 +901,7 @@ footer {
 }
 
 .back-link {
-  display: inline-block;
   margin-bottom: var(--spacing-lg);
-  color: var(--color-primary);
-  text-decoration: none;
-}
-
-.back-link:hover {
-  text-decoration: underline;
 }
 
 .search-form {
