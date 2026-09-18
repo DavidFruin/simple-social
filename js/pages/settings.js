@@ -45,6 +45,12 @@ const SettingsPage = {
         </div>
 
         <div class="settings-section">
+          <h2>Log Out</h2>
+          <p class="settings-note">Signs you out on this device.</p>
+          <button type="button" id="logout-btn" class="btn btn-secondary">Log Out</button>
+        </div>
+
+        <div class="settings-section">
           <h2>Delete Account</h2>
           <p class="warning-text">Warning: This action cannot be undone. All your data will be permanently deleted.</p>
           <form id="delete-form">
@@ -60,6 +66,8 @@ const SettingsPage = {
     `;
 
     document.getElementById('delete-form')?.addEventListener('submit', this.handleDeleteSubmit.bind(this));
+    // handleLogout lives in header.js, which owns session teardown.
+    document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
 
     const themeSelect = document.getElementById('theme-select');
     if (themeSelect) {

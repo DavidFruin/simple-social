@@ -23,11 +23,9 @@ function renderHeader() {
           </a>
           <a href="/app.html#/profile">Profile</a>
           <a href="/app.html#/settings">Settings</a>
-          <a href="#" id="logout-btn">Logout</a>
         </nav>
       </div>
     `;
-    document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
   } else {
     header.innerHTML = `
       <div class="header-content">
@@ -72,8 +70,7 @@ function renderThumbNav() {
     { href: '/app.html#/search', label: 'Search' },
     { href: '/app.html#/notifications', label: 'Notifications', badge: true },
     { href: '/app.html#/profile', label: 'Profile' },
-    { href: '/app.html#/settings', label: 'Settings' },
-    { href: '#', label: 'Logout', logout: true }
+    { href: '/app.html#/settings', label: 'Settings' }
   ];
   const radius = 150;
   const angleStep = 90 / (items.length - 1);
@@ -94,7 +91,7 @@ function renderThumbNav() {
     // pixels apart vertically.
     const rot = (mirror * (90 - angle)).toFixed(1);
     return `
-      <a href="${item.href}" class="thumb-nav-item" style="--tx: ${tx}px; --ty: ${ty}px; --rot: ${rot}deg; transition-delay: ${i * 25}ms;"${item.logout ? ' data-logout="true"' : ''}>
+      <a href="${item.href}" class="thumb-nav-item" style="--tx: ${tx}px; --ty: ${ty}px; --rot: ${rot}deg; transition-delay: ${i * 25}ms;">
         <span class="thumb-nav-label">${item.label}</span>
         <span class="thumb-nav-dot"></span>
         ${item.badge ? '<span class="badge notif-badge thumb-nav-item-badge hidden"></span>' : ''}
@@ -131,14 +128,10 @@ function renderThumbNav() {
         return;
       }
 
-      const item = e.target.closest('.thumb-nav-item');
-      if (item) {
+      // Picking anything closes the menu; the link itself handles navigating.
+      if (e.target.closest('.thumb-nav-item')) {
         container.classList.remove('open');
         document.getElementById('thumb-nav-toggle')?.setAttribute('aria-expanded', 'false');
-        if (item.dataset.logout) {
-          e.preventDefault();
-          handleLogout(e);
-        }
       }
     });
   }
@@ -252,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.renderHeader = renderHeader;
 window.updateHeaderState = renderHeader;
+window.handleLogout = handleLogout;
 window.updateNotificationBadge = updateNotificationBadge;
 window.startNotificationCheck = startNotificationCheck;
 window.stopNotificationCheck = stopNotificationCheck;
