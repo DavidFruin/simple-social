@@ -1,7 +1,13 @@
 // pages/create-post.js - Create Post Page
 
-// Matches MAX_MEDIA_SECONDS in media.php.
+// Matches MAX_MEDIA_SECONDS and MAX_VIDEO_FPS in media.php.
 const MAX_RECORDING_MINUTES = 5;
+const MAX_VIDEO_FPS = 60;
+
+// Chosen so a full-length recording still fits the server's 100MB video
+// limit: 2Mbps + 128kbps for 5 minutes is roughly 80MB.
+const VIDEO_BITS_PER_SECOND = 2000000;
+const AUDIO_BITS_PER_SECOND = 128000;
 
 const CreatePostPage = {
   recordingTimer: null,
@@ -301,9 +307,16 @@ const CreatePostPage = {
     const video = document.getElementById('capture-video');
     const audioViz = document.getElementById('capture-audio-viz');
 
+    // Without an explicit size the browser hands back its own default, which
+    // is commonly 640x480. "ideal" rather than "exact" so a device that can't
+    // manage it still works, just smaller. The frame rate ceiling matches the
+    // server's, so nothing is recorded at a rate that only gets resampled
+    // away during conversion.
+    const hd = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+
     const constraints = {
-      photo: { video: true, audio: false },
-      video: { video: true, audio: true },
+      photo: { video: hd, audio: false },
+      video: { video: { ...hd, frameRate: { ideal: 30, max: MAX_VIDEO_FPS } }, audio: true },
       audio: { video: false, audio: true }
     }[mode];
 
@@ -487,7 +500,11 @@ const CreatePostPage = {
         ...this.captureStream.getAudioTracks()
       ]);
       
-      this.mediaRecorder = new MediaRecorder(recordStream, { mimeType });
+      this.mediaRecorder = new MediaRecorder(recordStream, {
+        mimeType,
+        videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
+        audioBitsPerSecond: AUDIO_BITS_PER_SECOND
+      });
       this.recordedChunks = [];
 
       this.mediaRecorder.ondataavailable = (e) => {
@@ -537,7 +554,7 @@ const CreatePostPage = {
         }
       }
 
-      this.mediaRecorder = new MediaRecorder(audioStream, { mimeType });
+      this.mediaRecorder = new MediaRecorder(audioStream, { mimeType, audioBitsPerSecond: AUDIO_BITS_PER_SECOND });
       this.recordedChunks = [];
 
       this.mediaRecorder.ondataavailable = (e) => {
