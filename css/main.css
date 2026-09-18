@@ -541,7 +541,7 @@ footer {
 
 /* ============== COMMENTS ============== */
 .comment {
-  background: var(--color-bg-secondary);
+  background: var(--color-bg);
   padding: var(--spacing-md);
   border-radius: var(--border-radius-sm);
   margin-bottom: var(--spacing-sm);
