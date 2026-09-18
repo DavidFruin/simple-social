@@ -80,8 +80,32 @@ function showSuccess(message) {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+// Holds a field to exactly what the server accepts (validateContent in
+// api.php): printable ASCII plus the Latin-1 accented letters. Anything else
+// -- emoji, line breaks, tabs -- is dropped as it's typed or pasted rather
+// than being rejected on submit. Filtering on the input event, not keydown,
+// is what catches paste, drag-and-drop and phone emoji keyboards.
+const DISALLOWED_CHARS = /[^\x20-\x7E -ÿ]/g;
+
+function restrictTextInput(el) {
+  if (!el) return;
+
+  el.addEventListener('input', () => {
+    const before = el.value;
+    const cleaned = before.replace(DISALLOWED_CHARS, '');
+    if (cleaned === before) return;
+
+    // Put the caret back where it was, less whatever was dropped ahead of it.
+    const caret = el.selectionStart;
+    const removed = caret - before.slice(0, caret).replace(DISALLOWED_CHARS, '').length;
+    el.value = cleaned;
+    el.setSelectionRange(caret - removed, caret - removed);
+  });
+}
+
 window.showError = showError;
 window.showSuccess = showSuccess;
+window.restrictTextInput = restrictTextInput;
 window.updateHeader = updateHeaderState;
 
 window.onerror = function(msg, url, line, col, error) {

@@ -27,7 +27,8 @@ const CreatePostPage = {
         
         <div class="composer">
           <form id="post-form">
-            <textarea id="post-text" placeholder="What's on your mind?">${escapeHtml(draft)}</textarea>
+            <p class="composer-note">Letters, numbers, spaces, accented letters (&eacute; &ntilde; &uuml;) and these symbols: <code>! &quot; # $ % &amp; ' ( ) * + , - . / : ; &lt; = &gt; ? @ [ \\ ] ^ _ \` { | } ~</code><br>No emojis and no return characters.</p>
+            <textarea id="post-text" maxlength="5000" placeholder="What's on your mind?">${escapeHtml(draft)}</textarea>
             <p class="composer-note">Every post needs some text &mdash; media on its own isn't enough.</p>
 
             <div id="media-preview" class="media-preview"></div>
@@ -93,6 +94,8 @@ const CreatePostPage = {
     const captureBtn = document.getElementById('capture-media-btn');
 
     form?.addEventListener('submit', this.handlePostSubmit.bind(this));
+    // Before handleInput, so the draft it saves is already clean.
+    restrictTextInput(textarea);
     textarea?.addEventListener('input', this.handleInput.bind(this));
     selectMediaBtn?.addEventListener('click', () => mediaInput?.click());
     mediaInput?.addEventListener('change', this.handleMediaSelect.bind(this));

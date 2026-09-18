@@ -80,6 +80,7 @@ const PostPage = {
 
   attachEventListeners() {
     document.getElementById('comment-form')?.addEventListener('submit', this.handleCommentSubmit.bind(this));
+    restrictTextInput(document.getElementById('comment-text'));
     document.getElementById('back-link')?.addEventListener('click', (e) => {
       e.preventDefault();
       history.back();

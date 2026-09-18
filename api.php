@@ -306,8 +306,11 @@ function validatePasswordRules($password) {
     if (!preg_match('/[~!@#$%^&*()\-_+=\[\];\'"\/.,<>?:"{}|]/', $password)) bad('Password must contain a symbol', 400);
 }
 
+// Printable ASCII plus the Latin-1 accented letters. No emoji, and no line
+// breaks -- posts render them as spaces anyway, so they only ever looked like
+// they worked.
 function validateContent($text, $errorMsg = 'You are trying to post illegal characters') {
-    if (preg_match('/[^\x20-\x7E\n\r\xA0-\xFF]/u', $text)) bad($errorMsg, 400);
+    if (preg_match('/[^\x20-\x7E\xA0-\xFF]/u', $text)) bad($errorMsg, 400);
 }
 
 // ============== AUTH HANDLERS ==============
