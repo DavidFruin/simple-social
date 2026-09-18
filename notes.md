@@ -15,6 +15,7 @@ notifications when someone comments on a post that you've commented on
 change the style and color of the theme selector
 
 FUTURE IDEAS
+complaints and ideas page where people can report a bug, complain about a person, or suggest an idea for the app
 have to have a referal code to register account maybe?
 tagging people in posts and comments
 language switcher
