@@ -207,15 +207,14 @@ function createNotification($pdo, $recipientId, $actorId, $actorEmail, $type, $p
 }
 
 function notificationText($actorEmail, $type) {
-    $name = explode('@', $actorEmail)[0];
     switch ($type) {
-        case 'like': return "$name liked your post";
-        case 'unlike': return "$name unliked your post";
-        case 'comment': return "$name commented on your post";
-        case 'follow': return "$name started following you";
-        case 'unfollow': return "$name unfollowed you";
+        case 'like': return "$actorEmail liked your post";
+        case 'unlike': return "$actorEmail unliked your post";
+        case 'comment': return "$actorEmail commented on your post";
+        case 'follow': return "$actorEmail started following you";
+        case 'unfollow': return "$actorEmail unfollowed you";
     }
-    return "$name did something";
+    return "$actorEmail did something";
 }
 
 function pushNotification($pdo, $recipientId, $actorEmail, $type, $postId, $actorId) {
