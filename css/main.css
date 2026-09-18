@@ -1337,7 +1337,12 @@ footer {
   border-radius: var(--border-radius);
 }
 
+/* Block, not the inline-block the image/video previews use: those shrink-wrap
+   to the media's own dimensions, but an <audio> has none, so a width: 100%
+   player inside a shrink-to-fit box collapses to nothing. */
 .media-preview-item.audio {
+  display: block;
+  max-width: 400px;
   padding: var(--spacing-md);
   background: var(--color-bg-secondary);
   border-radius: var(--border-radius);
@@ -1345,7 +1350,7 @@ footer {
 
 .media-preview-item audio {
   width: 100%;
-  max-width: 400px;
+  display: block;
 }
 
 .media-remove-btn {
