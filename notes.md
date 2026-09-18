@@ -15,6 +15,7 @@ allow links in post text
 FUTURE IDEAS
 have to have a referal code to register account maybe?
 tagging people in posts and comments
+language switcher
 
 STYLE BUGS
 back button on an expanded post is too hard to tap on a phone
