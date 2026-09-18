@@ -125,6 +125,14 @@ const PostPage = {
     this.attachPostEventListeners();
   },
 
+  // Patches just the count instead of calling renderPost() again, which
+  // would rebuild the whole card and reload its image/video for a one-word
+  // text change.
+  updateCommentCount() {
+    const el = document.querySelector('#post-container .comment-count');
+    if (el) el.textContent = `(${this.comments.length}) comments`;
+  },
+
   // Single delegated listener (see feed.js) - prevents handler accumulation
   // when the post card re-renders after like/unlike.
   attachPostEventListeners() {
@@ -166,9 +174,10 @@ const PostPage = {
       // The API returns newest-first; reverse so the newest comment ends up
       // at the bottom of the list instead of the top.
       this.comments = (result.comments || []).slice().reverse();
-      
+
       loading?.classList.add('hidden');
       this.renderComments();
+      this.updateCommentCount();
     } catch (err) {
       loading?.classList.add('hidden');
       showError(err.message);
@@ -316,6 +325,7 @@ const PostPage = {
 
       textarea.value = '';
       this.renderComments();
+      this.updateCommentCount();
       showSuccess('Comment posted!');
     } catch (err) {
       showError(err.message);
@@ -336,6 +346,7 @@ const PostPage = {
       if (!this.isActive) return;
       this.comments = this.comments.filter(c => c.id != commentId);
       this.renderComments();
+      this.updateCommentCount();
       showSuccess('Comment deleted');
     } catch (err) {
       showError(err.message);
