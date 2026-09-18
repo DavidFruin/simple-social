@@ -33,7 +33,7 @@ const CreatePostPage = {
             
             <div class="media-upload-section">
               <input type="file" id="media-input" accept="image/jpeg,image/png,image/gif,image/webp,video/quicktime,video/mp4,video/m4v,audio/wav,audio/mpeg,audio/mp3" style="display:none">
-              <button type="button" id="select-media-btn" class="btn btn-secondary">Add Media</button>
+              <button type="button" id="select-media-btn" class="btn btn-secondary">Upload Media</button>
               <button type="button" id="capture-media-btn" class="btn btn-secondary">Capture Media</button>
               <span id="media-status"></span>
             </div>
@@ -42,20 +42,29 @@ const CreatePostPage = {
               <div class="capture-overlay"></div>
               <div class="capture-container">
                 <div class="capture-header">
-                  <h3>Capture Media</h3>
+                  <h3 id="capture-title">Capture Media</h3>
                   <button type="button" class="capture-close" onclick="CreatePostPage.closeCaptureModal()">×</button>
                 </div>
-                <div class="capture-preview">
-                  <video id="capture-video" autoplay playsinline muted></video>
-                  <canvas id="capture-canvas" class="hidden"></canvas>
-                  <div id="capture-audio-viz" class="capture-audio-viz hidden">
-                    <div class="cava-bars"></div>
-                  </div>
+
+                <div id="capture-chooser" class="capture-chooser">
+                  <button type="button" id="choose-photo-btn" class="btn btn-secondary">Photo</button>
+                  <button type="button" id="choose-video-btn" class="btn btn-secondary">Video</button>
+                  <button type="button" id="choose-audio-btn" class="btn btn-secondary">Audio</button>
                 </div>
-                <div class="capture-controls">
-                  <button type="button" id="capture-photo-btn" class="btn btn-primary">📷 Photo</button>
-                  <button type="button" id="capture-video-btn" class="btn btn-primary">🎥 Video</button>
-                  <button type="button" id="capture-audio-btn" class="btn btn-primary">🎤 Audio</button>
+
+                <div id="capture-stage" class="hidden">
+                  <div class="capture-preview">
+                    <video id="capture-video" autoplay playsinline muted></video>
+                    <canvas id="capture-canvas" class="hidden"></canvas>
+                    <div id="capture-audio-viz" class="capture-audio-viz hidden">
+                      <div class="cava-bars"></div>
+                    </div>
+                  </div>
+                  <div class="capture-controls">
+                    <button type="button" id="capture-photo-btn" class="btn btn-primary hidden">Take Photo</button>
+                    <button type="button" id="capture-video-btn" class="btn btn-primary hidden">Start Recording</button>
+                    <button type="button" id="capture-audio-btn" class="btn btn-primary hidden">Start Recording</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -84,6 +93,11 @@ const CreatePostPage = {
     selectMediaBtn?.addEventListener('click', () => mediaInput?.click());
     mediaInput?.addEventListener('change', this.handleMediaSelect.bind(this));
     captureBtn?.addEventListener('click', this.openCaptureModal.bind(this));
+
+    // Step one: pick what to capture. Nothing is switched on until then.
+    document.getElementById('choose-photo-btn')?.addEventListener('click', () => this.startCapture('photo'));
+    document.getElementById('choose-video-btn')?.addEventListener('click', () => this.startCapture('video'));
+    document.getElementById('choose-audio-btn')?.addEventListener('click', () => this.startCapture('audio'));
 
     // Capture controls
     document.getElementById('capture-photo-btn')?.addEventListener('click', this.capturePhoto.bind(this));
@@ -246,46 +260,74 @@ const CreatePostPage = {
     }
   },
 
-  async openCaptureModal() {
+  // Opens on the chooser. Nothing is requested from the camera or microphone
+  // until a mode is picked, so opening this doesn't trigger a permission
+  // prompt on its own.
+  openCaptureModal() {
     const modal = document.getElementById('capture-modal');
-    const video = document.getElementById('capture-video');
-    const captureBtns = document.querySelectorAll('#capture-photo-btn, #capture-video-btn, #capture-audio-btn');
-    const status = document.getElementById('media-status');
-    const videoBtn = document.getElementById('capture-video-btn');
-    const audioBtn = document.getElementById('capture-audio-btn');
-
-    if (!modal || !video) return;
+    if (!modal) return;
 
     this.stopCaptureStream();
-
+    document.getElementById('capture-chooser')?.classList.remove('hidden');
+    document.getElementById('capture-stage')?.classList.add('hidden');
+    const title = document.getElementById('capture-title');
+    if (title) title.textContent = 'Capture Media';
     modal.classList.remove('hidden');
-    status.textContent = 'Starting camera...';
+  },
+
+  // Each mode asks only for the devices it actually needs, so choosing Audio
+  // never switches the camera on, and Photo never opens the microphone.
+  async startCapture(mode) {
+    const status = document.getElementById('media-status');
+    const video = document.getElementById('capture-video');
+    const audioViz = document.getElementById('capture-audio-viz');
+
+    const constraints = {
+      photo: { video: true, audio: false },
+      video: { video: true, audio: true },
+      audio: { video: false, audio: true }
+    }[mode];
+
+    status.textContent = mode === 'audio' ? 'Starting microphone...' : 'Starting camera...';
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-
-      this.captureStream = stream;
-      // Mute the live preview so the microphone isn't played back through the speakers.
-      video.muted = true;
-      video.srcObject = stream;
-      video.style.display = 'block';
-
-      // Show/hide relevant buttons
-      videoBtn.style.display = 'inline-block';
-      audioBtn.style.display = 'inline-block';
-      
-      captureBtns.forEach(btn => btn.disabled = false);
-      this.recording = false;
-      this.recordedChunks = [];
-      status.textContent = '';
+      this.captureStream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch (err) {
       console.error('Error accessing media devices:', err);
-      showError('Could not access camera/microphone. Please check permissions.');
-      this.closeCaptureModal();
+      showError(mode === 'audio'
+        ? 'Could not access the microphone. Please check permissions.'
+        : 'Could not access the camera. Please check permissions.');
+      status.textContent = '';
+      return;
     }
+
+    this.recording = false;
+    this.recordedChunks = [];
+
+    document.getElementById('capture-chooser')?.classList.add('hidden');
+    document.getElementById('capture-stage')?.classList.remove('hidden');
+    const title = document.getElementById('capture-title');
+    if (title) title.textContent = { photo: 'Take a Photo', video: 'Record Video', audio: 'Record Audio' }[mode];
+
+    if (mode === 'audio') {
+      video.style.display = 'none';
+      audioViz.classList.remove('hidden');
+      // Runs from the moment the mic opens, so there's something to look at
+      // before recording starts.
+      this.setupAudioVisualizer(this.captureStream);
+    } else {
+      // Muted so the microphone isn't played back through the speakers.
+      video.muted = true;
+      video.srcObject = this.captureStream;
+      video.style.display = 'block';
+      audioViz.classList.add('hidden');
+    }
+
+    document.getElementById('capture-photo-btn').classList.toggle('hidden', mode !== 'photo');
+    document.getElementById('capture-video-btn').classList.toggle('hidden', mode !== 'video');
+    document.getElementById('capture-audio-btn').classList.toggle('hidden', mode !== 'audio');
+
+    status.textContent = '';
   },
 
   closeCaptureModal() {
@@ -307,12 +349,11 @@ const CreatePostPage = {
     }
     this.recording = false;
     this.recordedChunks = [];
-    
-    // Reset button texts
+
     const videoBtn = document.getElementById('capture-video-btn');
     const audioBtn = document.getElementById('capture-audio-btn');
-    if (videoBtn) videoBtn.textContent = '🎥 Video';
-    if (audioBtn) audioBtn.textContent = '🎤 Audio';
+    if (videoBtn) videoBtn.textContent = 'Start Recording';
+    if (audioBtn) audioBtn.textContent = 'Start Recording';
   },
 
   async capturePhoto() {
@@ -320,11 +361,6 @@ const CreatePostPage = {
     const canvas = document.getElementById('capture-canvas');
     const status = document.getElementById('media-status');
     const selectMediaBtn = document.getElementById('select-media-btn');
-
-    if (!video || !video.srcObject) {
-      showError('Camera not available. Click "Capture Media" first.');
-      return;
-    }
 
     status.textContent = 'Capturing photo...';
 
@@ -363,25 +399,9 @@ const CreatePostPage = {
       return;
     }
 
-    const video = document.getElementById('capture-video');
     const status = document.getElementById('media-status');
     const selectMediaBtn = document.getElementById('select-media-btn');
     const videoBtn = document.getElementById('capture-video-btn');
-
-    if (!this.captureStream) {
-      // Request camera if not already open
-      status.textContent = 'Starting camera...';
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        this.captureStream = stream;
-        video.muted = true;
-        video.srcObject = stream;
-        video.style.display = 'block';
-      } catch (err) {
-        showError('Camera not available. Click "Capture Media" first.');
-        return;
-      }
-    }
 
     status.textContent = 'Starting video recording...';
     selectMediaBtn.disabled = true;
@@ -419,7 +439,7 @@ const CreatePostPage = {
       this.recording = true;
       this.recordingType = 'video';
 
-      videoBtn.textContent = '⏹ Stop';
+      videoBtn.textContent = 'Stop Recording';
       status.textContent = 'Recording video... (click to stop)';
     } catch (err) {
       console.error('Error starting video recording:', err);
@@ -434,49 +454,15 @@ const CreatePostPage = {
       return;
     }
 
-    const video = document.getElementById('capture-video');
-    const audioViz = document.getElementById('capture-audio-viz');
     const status = document.getElementById('media-status');
     const selectMediaBtn = document.getElementById('select-media-btn');
     const audioBtn = document.getElementById('capture-audio-btn');
-
-    if (!this.captureStream) {
-      // Request microphone only
-      status.textContent = 'Starting microphone...';
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        this.captureStream = stream;
-        video.style.display = 'none';
-        audioViz.classList.remove('hidden');
-      } catch (err) {
-        showError('Microphone not available. Click "Capture Media" first.');
-        return;
-      }
-    } else {
-      // Hide video, show audio viz
-      video.style.display = 'none';
-      audioViz.classList.remove('hidden');
-    }
-
-    // Hide video when recording audio
-    video.style.display = 'none';
-    audioViz.classList.remove('hidden');
 
     status.textContent = 'Starting audio recording...';
     selectMediaBtn.disabled = true;
 
     try {
-      const audioTracks = this.captureStream.getAudioTracks();
-      if (audioTracks.length === 0) {
-        showError('No microphone available');
-        selectMediaBtn.disabled = false;
-        return;
-      }
-
-      const audioStream = new MediaStream(audioTracks);
-      
-      // Set up audio visualizer
-      this.setupAudioVisualizer(audioStream);
+      const audioStream = new MediaStream(this.captureStream.getAudioTracks());
 
       let mimeType = 'audio/mp4;codecs=mp4a.40.2';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -504,7 +490,7 @@ const CreatePostPage = {
       this.recording = true;
       this.recordingType = 'audio';
 
-      audioBtn.textContent = '⏹ Stop';
+      audioBtn.textContent = 'Stop Recording';
       status.textContent = 'Recording audio... (click to stop)';
     } catch (err) {
       console.error('Error starting audio recording:', err);
@@ -538,8 +524,10 @@ const CreatePostPage = {
     }
 
     const updateViz = () => {
-      if (!this.recording || !this.analyser) return;
-      
+      // Keyed off the analyser, not this.recording, so the bars move as soon
+      // as the mic is live rather than only once recording has started.
+      if (!this.analyser) return;
+
       const bufferLength = this.analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
       this.analyser.getByteFrequencyData(dataArray);
@@ -575,23 +563,17 @@ const CreatePostPage = {
     const status = document.getElementById('media-status');
     const videoBtn = document.getElementById('capture-video-btn');
     const audioBtn = document.getElementById('capture-audio-btn');
-    const video = document.getElementById('capture-video');
-    const audioViz = document.getElementById('capture-audio-viz');
-    
+
     if (!this.mediaRecorder || !this.recording) return;
 
     status.textContent = 'Processing...';
     this.mediaRecorder.stop();
     this.recording = false;
 
-    // Reset button text
     if (this.recordingType === 'video' && videoBtn) {
-      videoBtn.textContent = '🎥 Video';
+      videoBtn.textContent = 'Start Recording';
     } else if (this.recordingType === 'audio' && audioBtn) {
-      audioBtn.textContent = '🎤 Audio';
-      // Show video again for audio mode
-      if (video) video.style.display = 'block';
-      if (audioViz) audioViz.classList.add('hidden');
+      audioBtn.textContent = 'Start Recording';
     }
   },
 

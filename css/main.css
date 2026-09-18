@@ -1558,9 +1558,16 @@ html.media-viewer-open body {
   background: rgba(0, 0, 0, 0.8);
 }
 
+.capture-chooser {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .capture-container {
   position: relative;
-  background: var(--bg-secondary, #fff);
+  background: var(--color-bg);
   border-radius: 12px;
   padding: 20px;
   max-width: 90%;
