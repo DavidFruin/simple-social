@@ -68,7 +68,12 @@ const CreatePostPage = {
                   <div class="capture-controls">
                     <button type="button" id="capture-photo-btn" class="btn btn-primary hidden">Take Photo</button>
                     <button type="button" id="capture-video-btn" class="btn btn-primary hidden">Start Recording</button>
-                    <button type="button" id="capture-audio-btn" class="btn btn-primary hidden">Start Recording</button>
+                    <button type="button" id="capture-audio-btn" class="capture-record-btn hidden" title="Record" aria-label="Record">
+                      <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true">
+                        <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/>
+                        <path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -360,7 +365,18 @@ const CreatePostPage = {
     const videoBtn = document.getElementById('capture-video-btn');
     const audioBtn = document.getElementById('capture-audio-btn');
     if (videoBtn) videoBtn.textContent = 'Start Recording';
-    if (audioBtn) audioBtn.textContent = 'Start Recording';
+    // The audio button holds a mic icon, so its state is a class, not text.
+    if (audioBtn) this.setAudioButtonRecording(false);
+  },
+
+  setAudioButtonRecording(isRecording) {
+    const audioBtn = document.getElementById('capture-audio-btn');
+    if (!audioBtn) return;
+
+    audioBtn.classList.toggle('recording', isRecording);
+    const label = isRecording ? 'Stop recording' : 'Record';
+    audioBtn.title = label;
+    audioBtn.setAttribute('aria-label', label);
   },
 
   async capturePhoto() {
@@ -463,7 +479,6 @@ const CreatePostPage = {
 
     const status = document.getElementById('media-status');
     const selectMediaBtn = document.getElementById('select-media-btn');
-    const audioBtn = document.getElementById('capture-audio-btn');
 
     status.textContent = 'Starting audio recording...';
     selectMediaBtn.disabled = true;
@@ -497,8 +512,8 @@ const CreatePostPage = {
       this.recording = true;
       this.recordingType = 'audio';
 
-      audioBtn.textContent = 'Stop Recording';
-      status.textContent = 'Recording audio... (click to stop)';
+      this.setAudioButtonRecording(true);
+      status.textContent = 'Recording audio... (tap the mic to stop)';
     } catch (err) {
       console.error('Error starting audio recording:', err);
       showError('Could not start recording: ' + err.message);
@@ -517,40 +532,41 @@ const CreatePostPage = {
     this.analyser.fftSize = 256;
     source.connect(this.analyser);
 
-    // Create CAVA-style bars
     const barsContainer = audioViz.querySelector('.cava-bars');
-    if (barsContainer) {
-      barsContainer.innerHTML = '';
-      const bufferLength = this.analyser.frequencyBinCount;
-      for (let i = 0; i < 32; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'cava-bar';
-        bar.style.animationDelay = `${i * 0.05}s`;
-        barsContainer.appendChild(bar);
-      }
+    if (!barsContainer) return;
+
+    const BAR_COUNT = 32;
+    barsContainer.innerHTML = '';
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const bar = document.createElement('div');
+      bar.className = 'cava-bar';
+      barsContainer.appendChild(bar);
     }
+
+    const bars = barsContainer.querySelectorAll('.cava-bar');
+    const bufferLength = this.analyser.frequencyBinCount;
+    // Voices live in the bottom of the spectrum, so the bars are spread over
+    // the lower half. Across the whole range the upper two thirds would sit
+    // flat no matter how loud you spoke.
+    const binsPerBar = Math.max(1, Math.floor((bufferLength / 2) / BAR_COUNT));
+    const dataArray = new Uint8Array(bufferLength);
 
     const updateViz = () => {
       // Keyed off the analyser, not this.recording, so the bars move as soon
       // as the mic is live rather than only once recording has started.
       if (!this.analyser) return;
 
-      const bufferLength = this.analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
       this.analyser.getByteFrequencyData(dataArray);
-      
-      // Update bar heights based on frequency data
-      const bars = barsContainer.querySelectorAll('.cava-bar');
-      const step = Math.floor(bufferLength / bars.length);
+
       bars.forEach((bar, i) => {
-        const value = dataArray[i * step];
-        const height = (value / 255) * 100;
-        bar.style.height = `${Math.max(10, height)}%`;
+        let sum = 0;
+        for (let j = 0; j < binsPerBar; j++) sum += dataArray[i * binsPerBar + j];
+        bar.style.height = `${(sum / binsPerBar / 255) * 100}%`;
       });
-      
+
       this.animationFrame = requestAnimationFrame(updateViz);
     };
-    
+
     updateViz();
   },
 
@@ -569,7 +585,6 @@ const CreatePostPage = {
   stopRecording() {
     const status = document.getElementById('media-status');
     const videoBtn = document.getElementById('capture-video-btn');
-    const audioBtn = document.getElementById('capture-audio-btn');
 
     if (!this.mediaRecorder || !this.recording) return;
 
@@ -579,8 +594,8 @@ const CreatePostPage = {
 
     if (this.recordingType === 'video' && videoBtn) {
       videoBtn.textContent = 'Start Recording';
-    } else if (this.recordingType === 'audio' && audioBtn) {
-      audioBtn.textContent = 'Start Recording';
+    } else if (this.recordingType === 'audio') {
+      this.setAudioButtonRecording(false);
     }
   },
 
