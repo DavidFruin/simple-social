@@ -30,3 +30,4 @@ there is a flash when expanding a post
 when you go back from expanded post you usually are a little bellow where you actually were on the page
 when I go to settings page it is scrolled down a little bit so I can't see the theme selector
 when I open a new post I made it shows the comment count of the last post I opened in expanded view
+leaving the create post page loses the media you uploaded -- the text is saved as a draft but the media isn't, it should be kept so you can come back and post it later

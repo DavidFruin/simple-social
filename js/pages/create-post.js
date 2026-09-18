@@ -1,5 +1,11 @@
 // pages/create-post.js - Create Post Page
+
+// Matches MAX_MEDIA_SECONDS in media.php.
+const MAX_RECORDING_MINUTES = 5;
+
 const CreatePostPage = {
+  recordingTimer: null,
+  recordingStartedAt: 0,
   DRAFT_KEY: 'ss_post_draft',
   currentMediaUrl: null,
   currentMediaType: null,
@@ -39,7 +45,7 @@ const CreatePostPage = {
                 <button type="button" id="select-media-btn" class="btn btn-secondary">Upload Media</button>
                 <button type="button" id="capture-media-btn" class="btn btn-secondary">Capture Media</button>
               </div>
-              <p class="media-upload-note">One media file per post</p>
+              <p class="media-upload-note">One media file per post. Video and audio can't be longer than 5 minutes. Images and video are scaled down to 1920px on the longest side, and video above 60fps is reduced to 60.</p>
               <span id="media-status" class="media-upload-status"></span>
             </div>
 
@@ -65,6 +71,7 @@ const CreatePostPage = {
                       <div class="cava-bars"></div>
                     </div>
                   </div>
+                  <div id="capture-timer" class="capture-timer hidden">0:00</div>
                   <div class="capture-controls">
                     <button type="button" id="capture-photo-btn" class="btn btn-primary hidden">Take Photo</button>
                     <button type="button" id="capture-video-btn" class="btn btn-primary hidden">Start Recording</button>
@@ -361,12 +368,47 @@ const CreatePostPage = {
     }
     this.recording = false;
     this.recordedChunks = [];
+    this.stopRecordingTimer();
 
     const videoBtn = document.getElementById('capture-video-btn');
     const audioBtn = document.getElementById('capture-audio-btn');
     if (videoBtn) videoBtn.textContent = 'Start Recording';
     // The audio button holds a mic icon, so its state is a class, not text.
     if (audioBtn) this.setAudioButtonRecording(false);
+  },
+
+  // Recordings are capped at the same length the server accepts (see
+  // MAX_MEDIA_SECONDS in media.php), so a long take is stopped here rather
+  // than rejected after the upload.
+  startRecordingTimer() {
+    const timer = document.getElementById('capture-timer');
+    if (!timer) return;
+
+    this.recordingStartedAt = Date.now();
+    timer.classList.remove('hidden');
+
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - this.recordingStartedAt) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = String(elapsed % 60).padStart(2, '0');
+      timer.textContent = `${mins}:${secs} / ${MAX_RECORDING_MINUTES}:00`;
+
+      if (elapsed >= MAX_RECORDING_MINUTES * 60) {
+        this.stopRecording();
+        showError(`Recording stopped at the ${MAX_RECORDING_MINUTES} minute limit`);
+      }
+    };
+
+    tick();
+    this.recordingTimer = setInterval(tick, 250);
+  },
+
+  stopRecordingTimer() {
+    if (this.recordingTimer) {
+      clearInterval(this.recordingTimer);
+      this.recordingTimer = null;
+    }
+    document.getElementById('capture-timer')?.classList.add('hidden');
   },
 
   setAudioButtonRecording(isRecording) {
@@ -461,6 +503,7 @@ const CreatePostPage = {
       this.mediaRecorder.start(1000);
       this.recording = true;
       this.recordingType = 'video';
+      this.startRecordingTimer();
 
       videoBtn.textContent = 'Stop Recording';
       status.textContent = 'Recording video... (click to stop)';
@@ -511,6 +554,7 @@ const CreatePostPage = {
       this.mediaRecorder.start(100);
       this.recording = true;
       this.recordingType = 'audio';
+      this.startRecordingTimer();
 
       this.setAudioButtonRecording(true);
       status.textContent = 'Recording audio... (tap the mic to stop)';
@@ -591,6 +635,7 @@ const CreatePostPage = {
     status.textContent = 'Processing...';
     this.mediaRecorder.stop();
     this.recording = false;
+    this.stopRecordingTimer();
 
     if (this.recordingType === 'video' && videoBtn) {
       videoBtn.textContent = 'Start Recording';

@@ -136,6 +136,42 @@ function originalExtension($mimeType, $fileName) {
 }
 
 const FFMPEG = '/usr/bin/ffmpeg';
+const FFPROBE = '/usr/bin/ffprobe';
+
+// Longest side any stored image or video frame is scaled down to.
+const MAX_MEDIA_SIDE = 1920;
+// Video and audio can't be longer than this, in seconds.
+const MAX_MEDIA_SECONDS = 300;
+// Anything shot at a higher frame rate is resampled down to this.
+const MAX_VIDEO_FPS = 60;
+
+// Reads one ffprobe field. Returns '' when exec is unavailable or the probe
+// fails, which callers treat as "unknown" rather than as a failure.
+function ffprobeValue($path, $entries, $stream = false) {
+    if (!function_exists('exec')) return '';
+    $cmd = escapeshellarg(FFPROBE) . ' -v error'
+        . ($stream ? ' -select_streams v:0' : '')
+        . ' -show_entries ' . escapeshellarg($entries)
+        . ' -of csv=p=0 ' . escapeshellarg($path) . ' 2>/dev/null';
+    $out = [];
+    exec($cmd, $out);
+    return trim($out[0] ?? '');
+}
+
+// Duration in seconds, or 0 when it can't be determined.
+function mediaDuration($path) {
+    return (float)ffprobeValue($path, 'format=duration');
+}
+
+// Frame rate as a number -- ffprobe reports it as a fraction like "60000/1001".
+// Returns 0 when it can't be determined.
+function videoFrameRate($path) {
+    $raw = ffprobeValue($path, 'stream=r_frame_rate', true);
+    if ($raw === '') return 0;
+    if (strpos($raw, '/') === false) return (float)$raw;
+    [$num, $den] = explode('/', $raw, 2);
+    return (float)$den > 0 ? (float)$num / (float)$den : 0;
+}
 
 // Runs ffmpeg with the given arguments (each shell-escaped). Returns true on success.
 function runFfmpeg($args) {
@@ -223,8 +259,8 @@ function processImage($inputPath, $outputPath) {
     $srcHeight = imagesy($src);
     logMsg("processImage: original size = {$srcWidth}x{$srcHeight}");
     
-    // Resize so the longest side is at most 1920px (portrait or landscape)
-    $maxSide = 1920;
+    // Resize so the longest side is at most MAX_MEDIA_SIDE (portrait or landscape)
+    $maxSide = MAX_MEDIA_SIDE;
     
     if (max($srcWidth, $srcHeight) > $maxSide) {
         $ratio = $maxSide / max($srcWidth, $srcHeight);
@@ -275,8 +311,18 @@ function processImage($inputPath, $outputPath) {
 function processVideo($inputPath, $outputBase, $originalExt, $thumbnailPath) {
     logMsg("processVideo: input=$inputPath output=$outputBase");
 
+    // Only resample when the source is actually above the cap -- forcing the
+    // rate unconditionally would duplicate frames on a 30fps clip and inflate
+    // it for nothing.
+    $filters = ffmpegScale(MAX_MEDIA_SIDE);
+    $sourceFps = videoFrameRate($inputPath);
+    if ($sourceFps > MAX_VIDEO_FPS) {
+        $filters .= ',fps=' . MAX_VIDEO_FPS;
+        logMsg("processVideo: source is {$sourceFps}fps, capping at " . MAX_VIDEO_FPS);
+    }
+
     $converted = runFfmpeg([
-        '-i', $inputPath, '-vf', ffmpegScale(1920),
+        '-i', $inputPath, '-vf', $filters,
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
         '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', "$outputBase.mp4",
     ]);
@@ -365,7 +411,19 @@ function handle_uploadMedia() {
     }
     
     logMsg("uploadMedia: tempInput=$tempInput exists=" . (file_exists($tempInput) ? "yes" : "no"));
-    
+
+    // Checked here rather than after conversion so an over-long file is
+    // rejected before spending minutes transcoding it. A duration of 0 means
+    // ffprobe couldn't tell us, so it's let through.
+    if ($mediaType === 'video' || $mediaType === 'audio') {
+        $duration = mediaDuration($tempInput);
+        if ($duration > MAX_MEDIA_SECONDS) {
+            @unlink($tempInput);
+            $maxMinutes = MAX_MEDIA_SECONDS / 60;
+            bad("That $mediaType is " . round($duration / 60, 1) . " minutes long. Max: $maxMinutes minutes", 400);
+        }
+    }
+
     $originalExt = originalExtension($mimeType, $fileName);
     $thumbnailPath = "{$typeDir}/thumb_{$base}.webp";
     

@@ -1684,6 +1684,18 @@ html.media-viewer-open body {
   background: #000;
 }
 
+.capture-timer {
+  text-align: center;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-sm);
+}
+
+.capture-timer.hidden {
+  display: none;
+}
+
 .capture-record-btn {
   width: 64px;
   height: 64px;
