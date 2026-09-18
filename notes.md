@@ -19,7 +19,6 @@ tagging people in posts and comments
 STYLE BUGS
 back button on an expanded post is too hard to tap on a phone
 theme doesn't change the background of text input fields
-make comments the same background color as the post card
 
 BUGS
 low importance: after posting, the feed doesn't show your own new post for a second -- had to reload the feed to see it
