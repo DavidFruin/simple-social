@@ -25,6 +25,7 @@ tagging people in posts and comments
 language switcher
 
 STYLE BUGS
+navigation hand setting should have a note saying it only matters on phones
 on phone view put the controls lower on the page on the create post page
 can't see all the playback speed options when you open the selector
 success and error messages should be slightly higher up on page in phone view
