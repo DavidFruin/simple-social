@@ -12,7 +12,11 @@ const API = {
       headers['Authorization'] = `Bearer ${this.jwt}`;
     }
 
-    const body = new URLSearchParams(data);
+    // Dropped rather than passed through: URLSearchParams stringifies null
+    // into the literal text "null", which is what put mediaUrl="null" on a
+    // batch of old posts. PHP reads an omitted field as null anyway.
+    const present = Object.entries(data).filter(([, v]) => v !== null && v !== undefined);
+    const body = new URLSearchParams(Object.fromEntries(present));
     body.set('action', action);
 
     try {
