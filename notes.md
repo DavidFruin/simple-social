@@ -14,6 +14,7 @@ better video controls
 notifications when someone comments on a post that you've commented on
 change the style and color of the theme selector
 media limitations set in config file
+add a page where people can see upcoming features in a bullet point list with ETA
 
 FUTURE IDEAS
 lock the site / log out all users for scheduled maintenance
