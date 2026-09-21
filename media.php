@@ -112,10 +112,12 @@ $allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 $allowedVideoTypes = ['video/quicktime', 'video/mp4', 'video/m4v', 'video/webm'];
 $allowedAudioTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/webm'];
 
+// Limits below are read from $CONFIG (config.php) so they can be adjusted
+// without touching this file.
 $maxSizes = [
-    'image' => 10 * 1024 * 1024,
-    'video' => 100 * 1024 * 1024,
-    'audio' => 50 * 1024 * 1024
+    'image' => $CONFIG['media_max_image_bytes'],
+    'video' => $CONFIG['media_max_video_bytes'],
+    'audio' => $CONFIG['media_max_audio_bytes']
 ];
 
 function getMediaType($mimeType) {
@@ -137,13 +139,6 @@ function originalExtension($mimeType, $fileName) {
 
 const FFMPEG = '/usr/bin/ffmpeg';
 const FFPROBE = '/usr/bin/ffprobe';
-
-// Longest side any stored image or video frame is scaled down to.
-const MAX_MEDIA_SIDE = 1920;
-// Video and audio can't be longer than this, in seconds.
-const MAX_MEDIA_SECONDS = 300;
-// Anything shot at a higher frame rate is resampled down to this.
-const MAX_VIDEO_FPS = 60;
 
 // Reads one ffprobe field. Returns '' when exec is unavailable or the probe
 // fails, which callers treat as "unknown" rather than as a failure.
@@ -216,8 +211,9 @@ function applyExifOrientation($img, $inputPath) {
 }
 
 function processImage($inputPath, $outputPath) {
+    global $CONFIG;
     logMsg("processImage: input=$inputPath output=$outputPath");
-    
+
     if (!file_exists($inputPath)) {
         logMsg("processImage ERROR: input file does not exist");
         return false;
@@ -259,8 +255,8 @@ function processImage($inputPath, $outputPath) {
     $srcHeight = imagesy($src);
     logMsg("processImage: original size = {$srcWidth}x{$srcHeight}");
     
-    // Resize so the longest side is at most MAX_MEDIA_SIDE (portrait or landscape)
-    $maxSide = MAX_MEDIA_SIDE;
+    // Resize so the longest side is at most media_max_side (portrait or landscape)
+    $maxSide = $CONFIG['media_max_side'];
     
     if (max($srcWidth, $srcHeight) > $maxSide) {
         $ratio = $maxSide / max($srcWidth, $srcHeight);
@@ -309,16 +305,18 @@ function processImage($inputPath, $outputPath) {
 // first frame as the thumbnail. If ffmpeg can't convert, keeps the original
 // file. Returns the saved file's extension, or false on failure.
 function processVideo($inputPath, $outputBase, $originalExt, $thumbnailPath) {
+    global $CONFIG;
     logMsg("processVideo: input=$inputPath output=$outputBase");
 
     // Only resample when the source is actually above the cap -- forcing the
     // rate unconditionally would duplicate frames on a 30fps clip and inflate
     // it for nothing.
-    $filters = ffmpegScale(MAX_MEDIA_SIDE);
+    $maxFps = $CONFIG['media_max_fps'];
+    $filters = ffmpegScale($CONFIG['media_max_side']);
     $sourceFps = videoFrameRate($inputPath);
-    if ($sourceFps > MAX_VIDEO_FPS) {
-        $filters .= ',fps=' . MAX_VIDEO_FPS;
-        logMsg("processVideo: source is {$sourceFps}fps, capping at " . MAX_VIDEO_FPS);
+    if ($sourceFps > $maxFps) {
+        $filters .= ',fps=' . $maxFps;
+        logMsg("processVideo: source is {$sourceFps}fps, capping at " . $maxFps);
     }
 
     $converted = runFfmpeg([
@@ -365,7 +363,7 @@ function processAudio($inputPath, $outputBase, $originalExt) {
 
 function handle_uploadMedia() {
     global $allowedImageTypes, $allowedVideoTypes, $allowedAudioTypes;
-    global $maxSizes;
+    global $maxSizes, $CONFIG;
     
     $user = requireAuth();
     $uid = $user['sub'];
@@ -417,10 +415,10 @@ function handle_uploadMedia() {
     // ffprobe couldn't tell us, so it's let through.
     if ($mediaType === 'video' || $mediaType === 'audio') {
         $duration = mediaDuration($tempInput);
-        if ($duration > MAX_MEDIA_SECONDS) {
+        $maxSeconds = $CONFIG['media_max_seconds'];
+        if ($duration > $maxSeconds) {
             @unlink($tempInput);
-            $maxMinutes = MAX_MEDIA_SECONDS / 60;
-            bad("That $mediaType is " . round($duration / 60, 1) . " minutes long. Max: $maxMinutes minutes", 400);
+            bad("That $mediaType is " . round($duration, 1) . " seconds long. Max: $maxSeconds seconds", 400);
         }
     }
 

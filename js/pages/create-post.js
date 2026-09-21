@@ -1,11 +1,11 @@
 // pages/create-post.js - Create Post Page
 
-// Matches MAX_MEDIA_SECONDS and MAX_VIDEO_FPS in media.php.
-const MAX_RECORDING_MINUTES = 5;
+// Matches media_max_seconds and media_max_fps in config.php.
+const MAX_RECORDING_SECONDS = 10;
 const MAX_VIDEO_FPS = 60;
 
-// Chosen so a full-length recording still fits the server's 100MB video
-// limit: 2Mbps + 128kbps for 5 minutes is roughly 80MB.
+// Chosen so a full-length recording comfortably fits the server's video
+// size limit (media_max_video_bytes in config.php).
 const VIDEO_BITS_PER_SECOND = 2000000;
 const AUDIO_BITS_PER_SECOND = 128000;
 
@@ -51,7 +51,7 @@ const CreatePostPage = {
                 <button type="button" id="select-media-btn" class="btn btn-secondary">Upload Media</button>
                 <button type="button" id="capture-media-btn" class="btn btn-secondary">Capture Media</button>
               </div>
-              <p class="media-upload-note">One media file per post. Video and audio can't be longer than 5 minutes. Images and video are scaled down to 1920px on the longest side, and video above 60fps is reduced to 60.</p>
+              <p class="media-upload-note">One media file per post. Video and audio can't be longer than ${MAX_RECORDING_SECONDS} seconds. Images and video are scaled down to 1920px on the longest side, and video above ${MAX_VIDEO_FPS}fps is reduced to ${MAX_VIDEO_FPS}.</p>
               <span id="media-status" class="media-upload-status"></span>
             </div>
 
@@ -410,7 +410,7 @@ const CreatePostPage = {
   },
 
   // Recordings are capped at the same length the server accepts (see
-  // MAX_MEDIA_SECONDS in media.php), so a long take is stopped here rather
+  // media_max_seconds in config.php), so a long take is stopped here rather
   // than rejected after the upload.
   startRecordingTimer() {
     const timer = document.getElementById('capture-timer');
@@ -421,13 +421,11 @@ const CreatePostPage = {
 
     const tick = () => {
       const elapsed = Math.floor((Date.now() - this.recordingStartedAt) / 1000);
-      const mins = Math.floor(elapsed / 60);
-      const secs = String(elapsed % 60).padStart(2, '0');
-      timer.textContent = `${mins}:${secs} / ${MAX_RECORDING_MINUTES}:00`;
+      timer.textContent = `${elapsed}s / ${MAX_RECORDING_SECONDS}s`;
 
-      if (elapsed >= MAX_RECORDING_MINUTES * 60) {
+      if (elapsed >= MAX_RECORDING_SECONDS) {
         this.stopRecording();
-        showError(`Recording stopped at the ${MAX_RECORDING_MINUTES} minute limit`);
+        showError(`Recording stopped at the ${MAX_RECORDING_SECONDS} second limit`);
       }
     };
 

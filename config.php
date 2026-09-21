@@ -4,6 +4,15 @@
 $CONFIG = [
     'debug' => true,
     'test_mode' => true,
+
+    // Media upload limits (media.php). Adjust these to change what's
+    // accepted without touching code.
+    'media_max_seconds' => 10,             // video/audio can't be longer than this
+    'media_max_fps' => 60,                 // video above this frame rate is resampled down
+    'media_max_side' => 1920,              // longest side (px) images and video frames are scaled to
+    'media_max_image_bytes' => 10 * 1024 * 1024,
+    'media_max_video_bytes' => 100 * 1024 * 1024,
+    'media_max_audio_bytes' => 50 * 1024 * 1024,
 ];
 
 function loadDotEnv($dir) {
