@@ -119,7 +119,7 @@ const FeedPage = {
       
       this.renderPosts();
     } catch (err) {
-      showError(err.message);
+      if (this.isActive) showError(err.message);
     } finally {
       this.loading = false;
       document.getElementById('loading-indicator')?.classList.add('hidden');
