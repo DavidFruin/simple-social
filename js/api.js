@@ -5,8 +5,52 @@
 const API = {
   baseUrl: '/api.php',
   jwt: null,
+  refreshToken: null,
 
-  async call(action, data = {}) {
+  // Holds the in-flight refresh so that several requests failing at once
+  // (the feed alone fires a handful in parallel) share a single refresh
+  // rather than each firing their own and racing each other.
+  _refreshInFlight: null,
+
+  // Swaps the refresh token for a fresh access token. Returns the new token,
+  // or null if the session is genuinely gone - in which case the caller
+  // falls back to asking for a password.
+  async refreshSession() {
+    if (this._refreshInFlight) return this._refreshInFlight;
+
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) return null;
+
+    this._refreshInFlight = (async () => {
+      try {
+        const body = new URLSearchParams();
+        body.set('action', 'refreshToken');
+        body.set('refreshToken', refreshToken);
+
+        const response = await fetch(this.baseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString()
+        });
+        const json = await response.json();
+        if (!response.ok || !json.valid || !json.jwt) return null;
+
+        // Through Store when it's available, so the rest of the app sees the
+        // new token; the bare setter is only for contexts without Store.
+        if (typeof Store !== 'undefined') Store.setJwt(json.jwt);
+        else this.setJwt(json.jwt);
+        return json.jwt;
+      } catch (error) {
+        return null;
+      } finally {
+        this._refreshInFlight = null;
+      }
+    })();
+
+    return this._refreshInFlight;
+  },
+
+  async call(action, data = {}, isRetry = false) {
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     if (this.jwt) {
       headers['Authorization'] = `Bearer ${this.jwt}`;
@@ -38,13 +82,26 @@ const API = {
         // deleteAccount also returns 401 for a wrong password, not an expired
         // session (reaching that handler at all requires a valid JWT), so it
         // must be excluded too or the real error never reaches the caller.
-        const bypassesSessionModal = action === 'login' || action === 'deleteAccount';
+        // refreshToken is excluded for the same reason as login: its own 401
+        // means the session is gone, and recursing would loop.
+        const bypassesSessionModal = action === 'login' || action === 'deleteAccount' || action === 'refreshToken';
 
-        if (!bypassesSessionModal && response.status === 401 && Store.isLoggedIn() && typeof SessionExpiredModal !== 'undefined') {
-          const retryFn = () => this.call(action, data);
-          const retryResult = await SessionExpiredModal.show(retryFn);
-          if (retryResult !== undefined && retryResult !== null) return retryResult;
-          return {};
+        if (!bypassesSessionModal && response.status === 401 && Store.isLoggedIn()) {
+          // A 401 usually just means the access token aged out, which the
+          // refresh token fixes silently. Only once that fails is the session
+          // actually over and worth interrupting the user for. isRetry stops
+          // this recursing if the fresh token is somehow rejected too.
+          if (!isRetry) {
+            const newJwt = await this.refreshSession();
+            if (newJwt) return this.call(action, data, true);
+          }
+
+          if (typeof SessionExpiredModal !== 'undefined') {
+            const retryFn = () => this.call(action, data);
+            const retryResult = await SessionExpiredModal.show(retryFn);
+            if (retryResult !== undefined && retryResult !== null) return retryResult;
+            return {};
+          }
         }
 
         throw new Error(errorMsg);
@@ -79,22 +136,46 @@ const API = {
     return this.jwt;
   },
 
+  // The refresh token outlives the access token and is what keeps this
+  // device signed in; losing it means re-entering a password.
+  setRefreshToken(token) {
+    this.refreshToken = token;
+    if (token) localStorage.setItem('ss_refresh', token);
+    else localStorage.removeItem('ss_refresh');
+  },
+
+  clearRefreshToken() {
+    this.refreshToken = null;
+    localStorage.removeItem('ss_refresh');
+  },
+
+  getRefreshToken() {
+    if (!this.refreshToken) {
+      this.refreshToken = localStorage.getItem('ss_refresh');
+    }
+    return this.refreshToken;
+  },
+
   isLoggedIn() {
     return !!this.getJwt();
   },
 
   // ============== AUTH ==============
   async login(email, password) {
-    return this.call('login', { email, password });
+    const result = await this.call('login', { email, password });
+    if (result && result.refreshToken) this.setRefreshToken(result.refreshToken);
+    return result;
   },
 
   async logout() {
     try {
       const result = await this.call('logout', {});
       this.clearJwt();
+      this.clearRefreshToken();
       return result;
     } catch (error) {
       this.clearJwt();
+      this.clearRefreshToken();
       throw error;
     }
   },
@@ -187,23 +268,36 @@ const API = {
   },
 
 
-  async uploadMedia(file) {
-    const formData = new FormData();
-    formData.append('action', 'uploadMedia');
-    formData.append('file', file);
+  // media.php requests don't go through call(), so they need their own
+  // refresh-and-retry - without it an aged-out token would fail an upload
+  // outright, which is exactly what used to happen here.
+  // buildBody() is re-invoked per attempt because a FormData body can't be
+  // safely reused across two fetches.
+  async mediaRequest(buildBody, extraHeaders = {}) {
+    const attempt = () => {
+      const headers = { ...extraHeaders };
+      if (this.jwt) headers['Authorization'] = 'Bearer ' + this.jwt;
+      return fetch('/media.php', { method: 'POST', headers, body: buildBody() });
+    };
 
-    const headers = {};
-    if (this.jwt) {
-      headers['Authorization'] = 'Bearer ' + this.jwt;
-    }
+    const response = await attempt();
+    if (response.status !== 401 || !this.getRefreshToken()) return response;
+
+    const newJwt = await this.refreshSession();
+    return newJwt ? attempt() : response;
+  },
+
+  async uploadMedia(file) {
+    const buildBody = () => {
+      const formData = new FormData();
+      formData.append('action', 'uploadMedia');
+      formData.append('file', file);
+      return formData;
+    };
 
     let response;
     try {
-      response = await fetch('/media.php', {
-        method: 'POST',
-        headers,
-        body: formData
-      });
+      response = await this.mediaRequest(buildBody);
     } catch (error) {
       // fetch() itself only throws for a connection that never happened at
       // all (offline, DNS failure, etc.) - a request the server responded to
@@ -239,20 +333,16 @@ const API = {
   },
 
   async deleteMedia(mediaId) {
-    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
-    if (this.jwt) {
-      headers['Authorization'] = 'Bearer ' + this.jwt;
-    }
-
-    const body = new URLSearchParams();
-    body.set('action', 'deleteMedia');
-    body.set('mediaId', mediaId);
+    const buildBody = () => {
+      const body = new URLSearchParams();
+      body.set('action', 'deleteMedia');
+      body.set('mediaId', mediaId);
+      return body.toString();
+    };
 
     try {
-      const response = await fetch('/media.php', {
-        method: 'POST',
-        headers,
-        body: body.toString()
+      const response = await this.mediaRequest(buildBody, {
+        'Content-Type': 'application/x-www-form-urlencoded'
       });
 
       const json = await response.json();

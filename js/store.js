@@ -133,6 +133,9 @@ const Store = {
     localStorage.removeItem(this.JWT_KEY);
     localStorage.removeItem(this.USER_KEY);
     api.clearJwt();
+    // Without this the device would still hold a usable refresh token after
+    // being logged out, and could silently resurrect the session.
+    api.clearRefreshToken();
     this.applyTheme();
     this.notify();
   },
