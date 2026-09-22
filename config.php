@@ -13,6 +13,9 @@ $CONFIG = [
     'media_max_image_bytes' => 10 * 1024 * 1024,
     'media_max_video_bytes' => 100 * 1024 * 1024,
     'media_max_audio_bytes' => 50 * 1024 * 1024,
+
+    // Max distinct @[id] mentions allowed in a single post or comment.
+    'max_mentions' => 10,
 ];
 
 function loadDotEnv($dir) {

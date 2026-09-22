@@ -39,7 +39,7 @@ function createPostCard(post, options = {}) {
         <span class="post-time">${formatTimestamp(post.timestamp)}</span>
         ${isOwner ? `<button class="btn-delete-post" data-post-id="${post.id}">Delete</button>` : ''}
       </div>
-      <div class="post-body">${escapeHtml(post.text)}</div>
+      <div class="post-body">${linkifyMentions(escapeHtml(post.text), post.mentions)}</div>
       <button type="button" class="btn btn-secondary post-show-more hidden">Show more</button>
       ${mediaHtml}
       <div class="post-footer">
@@ -103,6 +103,24 @@ function escapeHtml(unsafe) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Turns @[id] tokens (already surviving escapeHtml unchanged, since it's
+// only digits/brackets) into a link to that user's profile, showing whatever
+// email the server resolved the id to right now -- never the email as typed
+// when the mention was made, so it stays correct if that user's email
+// changes later. `mentions` is the [{id, email}] array the API attaches to
+// the post/comment; a null email (the user was deleted) renders as plain,
+// unlinked text instead.
+function linkifyMentions(escapedText, mentions) {
+  if (!mentions || !mentions.length) return escapedText;
+  const byId = {};
+  mentions.forEach(m => { byId[m.id] = m.email; });
+  return escapedText.replace(/@\[(\d+)\]/g, (match, id) => {
+    const email = byId[id];
+    if (!email) return '<span class="mention-deleted">@deleted user</span>';
+    return `<a href="#/profile/${id}" class="mention-link">@${escapeHtml(email)}</a>`;
+  });
 }
 
 // Escaped email for display, prefixed with "(you)" when it's the logged-in user's.
@@ -218,6 +236,7 @@ function updatePostLikeUI(postId, isLiked, likeCount) {
 
 window.updatePostLikeUI = updatePostLikeUI;
 window.escapeHtml = escapeHtml;
+window.linkifyMentions = linkifyMentions;
 window.displayEmail = displayEmail;
 window.formatTimestamp = formatTimestamp;
 window.createMediaHtml = createMediaHtml;

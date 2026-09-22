@@ -972,6 +972,19 @@ footer {
   font-size: 0.875rem;
 }
 
+.mention-wrap {
+  position: relative;
+}
+
+.mention-link {
+  font-weight: 600;
+}
+
+.mention-deleted {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 .users-list {
   display: flex;
   flex-direction: column;

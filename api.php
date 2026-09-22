@@ -213,6 +213,7 @@ function notificationText($actorEmail, $type) {
         case 'comment': return "$actorEmail commented on your post";
         case 'follow': return "$actorEmail started following you";
         case 'unfollow': return "$actorEmail unfollowed you";
+        case 'mention': return "$actorEmail mentioned you in a post";
     }
     return "$actorEmail did something";
 }
@@ -311,6 +312,50 @@ function validatePasswordRules($password) {
 // they worked.
 function validateContent($text, $errorMsg = 'You are trying to post illegal characters') {
     if (preg_match('/[^\x20-\x7E\xA0-\xFF]/u', $text)) bad($errorMsg, 400);
+}
+
+// ============== MENTIONS ==============
+// Mentions live in the text itself as @[id] tokens rather than a parallel
+// field, so a user's display name can change (they're only ever identified
+// by email, which is itself changeable) without rewriting old posts -- the
+// id is resolved to whatever email is current at render time.
+function extractMentions($text) {
+    global $CONFIG;
+    preg_match_all('/@\[(\d+)\]/', $text, $matches);
+    $ids = array_values(array_unique(array_map('intval', $matches[1])));
+    if (count($ids) > $CONFIG['max_mentions']) {
+        bad('Too many people tagged. Max: ' . $CONFIG['max_mentions'], 400);
+    }
+    return $ids;
+}
+
+function notifyMentions($pdo, $mentionIds, $actorId, $actorEmail, $postId) {
+    foreach ($mentionIds as $id) {
+        createNotification($pdo, $id, $actorId, $actorEmail, 'mention', $postId);
+    }
+}
+
+// Resolves @[id] tokens to {id, email} for the API response, so clients
+// don't need a separate round trip. A deleted user's id still resolves --
+// email comes back null and the caller renders a fallback.
+function hydrateMentions($pdo, $text) {
+    preg_match_all('/@\[(\d+)\]/', $text, $matches);
+    $ids = array_values(array_unique(array_map('intval', $matches[1])));
+    if (!$ids) return [];
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id IN ($placeholders)");
+    $stmt->execute($ids);
+    $emails = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $emails[(int)$row['id']] = $row['email'];
+    }
+
+    $result = [];
+    foreach ($ids as $id) {
+        $result[] = ['id' => $id, 'email' => $emails[$id] ?? null];
+    }
+    return $result;
 }
 
 // ============== AUTH HANDLERS ==============
@@ -656,6 +701,7 @@ function handle_getPostById($pdo, $user) {
             $ownerEmail = $ownerStmt->fetchColumn() ?: '';
             $post['userID'] = $ownerId;
             $post['userEmail'] = $ownerEmail;
+            $post['mentions'] = hydrateMentions($pdo, $post['text']);
             respond(good(['post' => $post]));
             return;
         }
@@ -705,6 +751,7 @@ function handle_post($pdo, $user) {
     if (!$text) bad('Post text required', 400);
     if (strlen($text) > 5000) bad('You are trying to make a post that is longer than 5K characters', 400);
     validateContent($text, 'You are trying to post illegal characters');
+    $mentionIds = extractMentions($text);
 
     $uid = $user['sub'];
     $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
@@ -729,6 +776,7 @@ function handle_post($pdo, $user) {
         $stmt = $pdo->prepare('UPDATE media SET post_id = ? WHERE path = ? AND user_id = ?');
         $stmt->execute([$newPost['id'], $rawMedia, $uid]);
     }
+    notifyMentions($pdo, $mentionIds, $uid, $user['email'], $newPost['id']);
     respond(good(['postId' => $newPost['id']]));
 }
 
@@ -751,6 +799,7 @@ function handle_getMyPosts($pdo, $user) {
     usort($posts, fn($a, $b) => strtotime($b['timestamp'] ?? '') <=> strtotime($a['timestamp'] ?? ''));
     $posts = array_slice($posts, $offset, $limit);
     $hasMore = ($offset + $limit) < $totalCount;
+    foreach ($posts as &$post) $post['mentions'] = hydrateMentions($pdo, $post['text']);
 
     respond(good(['posts' => $posts, 'hasMore' => $hasMore, 'totalCount' => $totalCount]));
 }
@@ -779,6 +828,7 @@ function handle_getUserPosts($pdo, $user) {
     usort($posts, fn($a, $b) => strtotime($b['timestamp'] ?? '') <=> strtotime($a['timestamp'] ?? ''));
     $posts = array_slice($posts, $offset, $limit);
     $hasMore = ($offset + $limit) < $totalCount;
+    foreach ($posts as &$post) $post['mentions'] = hydrateMentions($pdo, $post['text']);
 
     respond(good(['posts' => $posts, 'hasMore' => $hasMore, 'totalCount' => $totalCount]));
 }
@@ -905,6 +955,7 @@ function handle_fetchFollowedPosts($pdo, $user) {
     $totalCount = count($allPosts);
     $allPosts = array_slice($allPosts, $offset, $limit);
     $hasMore = ($offset + $limit) < $totalCount;
+    foreach ($allPosts as &$post) $post['mentions'] = hydrateMentions($pdo, $post['text']);
 
     respond(good(['posts' => $allPosts, 'hasMore' => $hasMore, 'totalCount' => $totalCount]));
 }
@@ -1139,17 +1190,21 @@ function handle_createComment($pdo, $user) {
     if (!$text) bad('Comment text required', 400);
     if (strlen($text) > 5000) bad('Comment too long (max 5000 chars)', 400);
     validateContent($text, 'Illegal characters in comment');
+    $mentionIds = extractMentions($text);
 
     $stmt = $pdo->prepare('INSERT INTO comments (post_id, user_id, comment_text, created_at) VALUES (?, ?, ?, ?)');
     $stmt->execute([$postId, $user['sub'], $text, date('Y-m-d H:i:s')]);
     $commentId = $pdo->lastInsertId();
 
     $ownerId = (int)explode('.', $postId)[0];
-    if ($ownerId != $user['sub']) {
+    if ($mentionIds || $ownerId != $user['sub']) {
         $stmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
         $stmt->execute([$user['sub']]);
         $actorEmail = $stmt->fetchColumn();
-        createNotification($pdo, $ownerId, $user['sub'], $actorEmail, 'comment', $postId);
+        if ($ownerId != $user['sub']) {
+            createNotification($pdo, $ownerId, $user['sub'], $actorEmail, 'comment', $postId);
+        }
+        notifyMentions($pdo, $mentionIds, $user['sub'], $actorEmail, $postId);
     }
 
     respond(good(['commentId' => $commentId]));
@@ -1164,6 +1219,7 @@ function handle_getPostComments($pdo, $user) {
     $stmt = $pdo->prepare('SELECT c.id, c.post_id, c.user_id, c.comment_text as text, c.created_at, u.email as user_email FROM comments c LEFT JOIN users u ON c.user_id = u.id WHERE c.post_id = ? ORDER BY c.created_at DESC LIMIT ? OFFSET ?');
     $stmt->execute([$postId, $limit, $offset]);
     $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($comments as &$comment) $comment['mentions'] = hydrateMentions($pdo, $comment['text']);
 
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM comments WHERE post_id = ?');
     $stmt->execute([$postId]);

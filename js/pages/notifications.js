@@ -168,6 +168,7 @@ const NotificationsPage = {
       case 'like': return '♥';
       case 'unlike': return '💔';
       case 'comment': return '💬';
+      case 'mention': return '@';
       case 'unfollow': return '👤';
       default: return '🔔';
     }
@@ -181,6 +182,7 @@ const NotificationsPage = {
       case 'like': return `${actor} liked your post`;
       case 'unlike': return `${actor} unliked your post`;
       case 'comment': return `${actor} commented on your post`;
+      case 'mention': return `${actor} mentioned you in a post`;
       default: return `${actor} interacted with you`;
     }
   },
@@ -193,6 +195,7 @@ const NotificationsPage = {
       case 'like':
       case 'unlike':
       case 'comment':
+      case 'mention':
         return `#/post/${notification.post_id}`;
       default:
         return '#/notifications';

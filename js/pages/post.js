@@ -42,7 +42,10 @@ const PostPage = {
         <h2>Comments</h2>
         <div class="comment-form">
           <form id="comment-form">
-            <textarea id="comment-text" placeholder="Write a comment..." maxlength="5000"></textarea>
+            <div class="mention-wrap">
+              <textarea id="comment-text" placeholder="Write a comment... (type @ to tag someone)" maxlength="5000"></textarea>
+              <div id="comment-text-mentions" class="search-dropdown hidden"></div>
+            </div>
             <button type="submit" class="btn btn-primary">Post Comment</button>
           </form>
         </div>
@@ -81,6 +84,7 @@ const PostPage = {
   attachEventListeners() {
     document.getElementById('comment-form')?.addEventListener('submit', this.handleCommentSubmit.bind(this));
     restrictTextInput(document.getElementById('comment-text'));
+    this.mentionPicker = MentionPicker.attach(document.getElementById('comment-text'), document.getElementById('comment-text-mentions'));
     document.getElementById('back-link')?.addEventListener('click', (e) => {
       e.preventDefault();
       history.back();
@@ -311,16 +315,18 @@ const PostPage = {
     submitBtn.textContent = 'Posting...';
 
     try {
-      const result = await api.createComment(this.postId, text);
+      const resolved = this.mentionPicker.resolve(text);
+      const result = await api.createComment(this.postId, resolved.text);
       if (!this.isActive) return;
       const user = Store.getUser();
-      
+
       this.comments.push({
         id: result.commentId,
         post_id: this.postId,
         user_id: user?.id,
         user_email: user?.email,
-        text: text,
+        text: resolved.text,
+        mentions: resolved.mentions,
         created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
       });
 

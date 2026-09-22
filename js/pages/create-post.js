@@ -40,8 +40,11 @@ const CreatePostPage = {
         <div class="composer">
           <form id="post-form">
             <p class="composer-note">Letters, numbers, spaces, accented letters (&eacute; &ntilde; &uuml;) and these symbols: <code>! &quot; # $ % &amp; ' ( ) * + , - . / : ; &lt; = &gt; ? @ [ \\ ] ^ _ \` { | } ~</code><br>No emojis and no return characters.</p>
-            <textarea id="post-text" maxlength="5000" placeholder="What's on your mind?">${escapeHtml(draft)}</textarea>
-            <p class="composer-note">Every post needs some text &mdash; media on its own isn't enough.</p>
+            <div class="mention-wrap">
+              <textarea id="post-text" maxlength="5000" placeholder="What's on your mind?">${escapeHtml(draft)}</textarea>
+              <div id="post-text-mentions" class="search-dropdown hidden"></div>
+            </div>
+            <p class="composer-note">Every post needs some text &mdash; media on its own isn't enough. Type @ to tag someone.</p>
 
             <div id="media-preview" class="media-preview"></div>
             
@@ -118,6 +121,7 @@ const CreatePostPage = {
     // Before handleInput, so the draft it saves is already clean.
     restrictTextInput(textarea);
     textarea?.addEventListener('input', this.handleInput.bind(this));
+    this.mentionPicker = MentionPicker.attach(textarea, document.getElementById('post-text-mentions'));
     selectMediaBtn?.addEventListener('click', () => mediaInput?.click());
     mediaInput?.addEventListener('change', this.handleMediaSelect.bind(this));
     captureBtn?.addEventListener('click', this.openCaptureModal.bind(this));
@@ -803,7 +807,8 @@ const CreatePostPage = {
     submitBtn.textContent = 'Posting...';
 
     try {
-      await api.post(text, this.currentMediaUrl);
+      const resolved = this.mentionPicker.resolve(text);
+      await api.post(resolved.text, this.currentMediaUrl);
 
       textarea.value = '';
       this.clearDraft();
