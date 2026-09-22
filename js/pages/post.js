@@ -42,7 +42,9 @@ const PostPage = {
         <h2>Comments</h2>
         <div class="comment-form">
           <form id="comment-form">
-            <div class="mention-wrap">
+            <!-- position:relative inlined rather than left to main.css - see
+                 the same wrapper in create-post.js. -->
+            <div class="mention-wrap" style="position: relative;">
               <textarea id="comment-text" placeholder="Write a comment... (type @ to tag someone)" maxlength="5000"></textarea>
               <div id="comment-text-mentions" class="search-dropdown hidden"></div>
             </div>

@@ -11,7 +11,7 @@ const AUDIO_BITS_PER_SECOND = 128000;
 
 // Bumped on deploys worth confirming landed on a given device - if this
 // doesn't match what was just shipped, the page is still cached/stale.
-const PAGE_BUILD = 'mention-fix-3';
+const PAGE_BUILD = 'mention-fix-4';
 
 const CreatePostPage = {
   recordingTimer: null,
@@ -45,7 +45,12 @@ const CreatePostPage = {
         <div class="composer">
           <form id="post-form">
             <p class="composer-note">Letters, numbers, spaces, accented letters (&eacute; &ntilde; &uuml;) and these symbols: <code>! &quot; # $ % &amp; ' ( ) * + , - . / : ; &lt; = &gt; ? @ [ \\ ] ^ _ \` { | } ~</code><br>No emojis and no return characters.</p>
-            <div class="mention-wrap">
+            <!-- position:relative is inlined, not left to main.css: the
+                 dropdown is absolutely positioned against this wrapper, and
+                 a device still holding a cached main.css from before this
+                 feature would otherwise anchor it to the page instead and
+                 render it a full viewport below the fold. -->
+            <div class="mention-wrap" style="position: relative;">
               <textarea id="post-text" maxlength="5000" placeholder="What's on your mind?">${escapeHtml(draft)}</textarea>
               <div id="post-text-mentions" class="search-dropdown hidden"></div>
             </div>
