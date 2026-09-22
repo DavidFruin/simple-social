@@ -121,7 +121,16 @@ const CreatePostPage = {
     // Before handleInput, so the draft it saves is already clean.
     restrictTextInput(textarea);
     textarea?.addEventListener('input', this.handleInput.bind(this));
-    this.mentionPicker = MentionPicker.attach(textarea, document.getElementById('post-text-mentions'));
+    // Never let a missing/failed MentionPicker (e.g. a stale cached page from
+    // just before a deploy, so this script never loaded) break the rest of
+    // this function - the buttons below still need their listeners attached
+    // either way.
+    try {
+      this.mentionPicker = MentionPicker.attach(textarea, document.getElementById('post-text-mentions'));
+    } catch (err) {
+      console.error('MentionPicker failed to attach:', err);
+      this.mentionPicker = null;
+    }
     selectMediaBtn?.addEventListener('click', () => mediaInput?.click());
     mediaInput?.addEventListener('change', this.handleMediaSelect.bind(this));
     captureBtn?.addEventListener('click', this.openCaptureModal.bind(this));
@@ -807,7 +816,10 @@ const CreatePostPage = {
     submitBtn.textContent = 'Posting...';
 
     try {
-      const resolved = this.mentionPicker.resolve(text);
+      // Falls back to posting the text exactly as typed if the picker never
+      // attached - any @[id] typed by hand still works, it just wasn't
+      // offered a dropdown to make it easier.
+      const resolved = this.mentionPicker ? this.mentionPicker.resolve(text) : { text };
       await api.post(resolved.text, this.currentMediaUrl);
 
       textarea.value = '';

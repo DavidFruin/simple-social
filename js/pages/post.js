@@ -84,7 +84,15 @@ const PostPage = {
   attachEventListeners() {
     document.getElementById('comment-form')?.addEventListener('submit', this.handleCommentSubmit.bind(this));
     restrictTextInput(document.getElementById('comment-text'));
-    this.mentionPicker = MentionPicker.attach(document.getElementById('comment-text'), document.getElementById('comment-text-mentions'));
+    // Never let a missing/failed MentionPicker (e.g. a stale cached page from
+    // just before a deploy, so this script never loaded) break the rest of
+    // this function.
+    try {
+      this.mentionPicker = MentionPicker.attach(document.getElementById('comment-text'), document.getElementById('comment-text-mentions'));
+    } catch (err) {
+      console.error('MentionPicker failed to attach:', err);
+      this.mentionPicker = null;
+    }
     document.getElementById('back-link')?.addEventListener('click', (e) => {
       e.preventDefault();
       history.back();
@@ -315,7 +323,10 @@ const PostPage = {
     submitBtn.textContent = 'Posting...';
 
     try {
-      const resolved = this.mentionPicker.resolve(text);
+      // Falls back to posting the text exactly as typed if the picker never
+      // attached - any @[id] typed by hand still works, it just wasn't
+      // offered a dropdown to make it easier.
+      const resolved = this.mentionPicker ? this.mentionPicker.resolve(text) : { text };
       const result = await api.createComment(this.postId, resolved.text);
       if (!this.isActive) return;
       const user = Store.getUser();
