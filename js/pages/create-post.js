@@ -9,10 +9,6 @@ const MAX_VIDEO_FPS = 60;
 const VIDEO_BITS_PER_SECOND = 2000000;
 const AUDIO_BITS_PER_SECOND = 128000;
 
-// Bumped on deploys worth confirming landed on a given device - if this
-// doesn't match what was just shipped, the page is still cached/stale.
-const PAGE_BUILD = 'mention-fix-4';
-
 const CreatePostPage = {
   recordingTimer: null,
   recordingStartedAt: 0,
@@ -40,7 +36,6 @@ const CreatePostPage = {
     container.innerHTML = `
       <div class="page-container">
         <h1>Create Post</h1>
-        <p class="composer-note">Build: ${PAGE_BUILD} &mdash; Mention picker: <span id="mention-picker-status">checking&hellip;</span></p>
 
         <div class="composer">
           <form id="post-form">
@@ -140,10 +135,6 @@ const CreatePostPage = {
     } catch (err) {
       console.error('MentionPicker failed to attach:', err);
       this.mentionPicker = null;
-    }
-    const pickerStatus = document.getElementById('mention-picker-status');
-    if (pickerStatus) {
-      pickerStatus.textContent = this.mentionPicker ? 'ready' : 'NOT loaded (refresh again)';
     }
     selectMediaBtn?.addEventListener('click', () => mediaInput?.click());
     mediaInput?.addEventListener('change', this.handleMediaSelect.bind(this));
