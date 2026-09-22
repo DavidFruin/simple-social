@@ -228,10 +228,16 @@ function pushNotification($pdo, $recipientId, $actorEmail, $type, $postId, $acto
     if (!$subscriptions) return;
 
     $url = $postId ? "/app.html#/post/$postId" : "/app.html#/profile/$actorId";
+    // The service worker re-asserts this count against the OS home-screen
+    // badge on every notification event it sees (shown, clicked, swiped
+    // away) - the badge is only ever meant to change via "mark as read", so
+    // it has to keep reapplying the real count rather than trust whatever
+    // the OS did on its own.
     $payload = [
         'title' => 'Simple Social',
         'body' => notificationText($actorEmail, $type),
         'url' => $url,
+        'count' => getUnseenNotificationCount($pdo, $recipientId),
     ];
     $subject = $CONFIG['vapid_subject'] ?? 'noreply@davidfruin.com';
 
@@ -665,21 +671,28 @@ function handle_getNotifications($pdo, $user) {
     respond(good(['notifications' => $stmt->fetchAll(PDO::FETCH_ASSOC)]));
 }
 
-function handle_getUnseenNotificationCount($pdo, $user) {
+// Shared with pushNotification() so a push payload's embedded count is
+// computed the exact same way the notifications page's own count is -- the
+// service worker re-asserts this value against the OS badge on every
+// notification interaction it sees, so it has to match.
+function getUnseenNotificationCount($pdo, $userId) {
     $stmt = $pdo->prepare('SELECT last_notifications_seen_at FROM users WHERE id = ?');
-    $stmt->execute([$user['sub']]);
+    $stmt->execute([$userId]);
     $lastSeen = $stmt->fetchColumn();
 
     if (!$lastSeen) {
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND (actor_id != ? OR type = \'mention\')');
-        $stmt->execute([$user['sub'], $user['sub']]);
+        $stmt->execute([$userId, $userId]);
     } else {
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND (actor_id != ? OR type = \'mention\') AND created_at > ?');
-        $stmt->execute([$user['sub'], $user['sub'], $lastSeen]);
+        $stmt->execute([$userId, $userId, $lastSeen]);
     }
 
-    $count = (int)$stmt->fetchColumn();
-    respond(good(['count' => $count]));
+    return (int)$stmt->fetchColumn();
+}
+
+function handle_getUnseenNotificationCount($pdo, $user) {
+    respond(good(['count' => getUnseenNotificationCount($pdo, $user['sub'])]));
 }
 
 function handle_markNotificationsSeen($pdo, $user) {

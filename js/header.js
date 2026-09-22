@@ -184,12 +184,18 @@ function updateNotificationBadge() {
   // Only touch the home-screen badge once the count is actually known.
   // Otherwise every app launch would clear it before the first poll returns,
   // making the number vanish without anyone hitting "Mark as Seen".
-  if ('setAppBadge' in navigator && Store.isNotificationCountLoaded()) {
-    if (count > 0) {
-      navigator.setAppBadge(count).catch(() => {});
-    } else {
-      navigator.clearAppBadge().catch(() => {});
+  if (Store.isNotificationCountLoaded()) {
+    if ('setAppBadge' in navigator) {
+      if (count > 0) {
+        navigator.setAppBadge(count).catch(() => {});
+      } else {
+        navigator.clearAppBadge().catch(() => {});
+      }
     }
+    // Keeps the service worker's own cached count in sync so it has the
+    // right value to re-apply the next time it sees a notification event
+    // (shown, clicked, swiped away) with no page open to ask.
+    navigator.serviceWorker?.controller?.postMessage({ type: 'SET_BADGE_COUNT', count });
   }
 }
 
