@@ -16,6 +16,18 @@ $CONFIG = [
 
     // Max distinct @[id] mentions allowed in a single post or comment.
     'max_mentions' => 10,
+
+    // Sessions. An access token is short-lived and refreshed silently; the
+    // session is the durable login and only expires after this long with no
+    // use at all - it slides forward every time a client refreshes, so an
+    // active device never has to re-enter a password.
+    'session_access_ttl' => 86400,          // 1 day
+    'session_refresh_ttl' => 30 * 86400,    // 30 days, sliding
+    // Logging in past this many live sessions revokes the least recently
+    // used one. Raise it if you legitimately use more devices than this -
+    // each browser counts as one, and so does each of the three C clients
+    // on each machine.
+    'session_max_per_user' => 10,
 ];
 
 function loadDotEnv($dir) {

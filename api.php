@@ -3,6 +3,8 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/logging.php';
 require_once __DIR__ . '/webpush.php';
+require_once __DIR__ . '/schema.php';
+require_once __DIR__ . '/auth.php';
 
 ob_start();
 ini_set('display_errors', 0);
@@ -108,63 +110,19 @@ function db() {
         if (!$hasTheme) $pdo->exec("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'light'");
         if (!$hasHand) $pdo->exec("ALTER TABLE users ADD COLUMN hand TEXT NOT NULL DEFAULT 'right'");
     } catch (Exception $e) {}
+    ensureSharedSchema($pdo);
     return $pdo;
 }
 
-function jwtEncode($payload) {
-    global $CONFIG;
-    $secret = $CONFIG['jwt_secret'] ?? null;
-    if (!$secret) { error_log('JWT secret not configured'); respond(['valid' => false, 'error' => 'Server misconfigured'], 500); }
-    $header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])));
-    $payloadStr = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
-    $sig = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(hash_hmac('sha256', "$header.$payloadStr", $secret, true)));
-    return "$header.$payloadStr.$sig";
-}
-
-function jwtDecode($jwt) {
-    global $action;
-    $parts = explode('.', $jwt);
-    if (count($parts) !== 3) return false;
-    $base64 = $parts[1];
-    $base64 = str_replace(['-', '_'], ['+', '/'], $base64);
-    $pad = strlen($base64) % 4;
-    if ($pad) $base64 .= str_repeat('=', 4 - $pad);
-    $payload = json_decode(base64_decode($base64), true);
-    logMsg("DECODE: payload=" . json_encode($payload));
-    if (!$payload || !isset($payload['sub'])) return false;
-    if (isset($payload['exp']) && time() > $payload['exp']) return false;
-    return $payload;
-}
-
-function verifyUser($jwt, $pdo) {
-    global $action;
-    $payload = jwtDecode($jwt);
-    logMsg("VERIFY: jwtDecode result=" . ($payload ? 'ok sub=' . ($payload['sub'] ?? 'none') : 'FAILED'));
-    if (!$payload || !isset($payload['sub'])) return false;
-    $stmt = $pdo->prepare('SELECT jwt FROM users WHERE id = ?');
-    $stmt->execute([$payload['sub']]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    logMsg("VERIFY: userId=" . $payload['sub'] . " row=" . ($row ? 'found' : 'NOT FOUND') . " jwt_field=" . ($row['jwt'] ?? 'NULL'));
-    if (!$row || !$row['jwt']) return false;
-    $stored = json_decode($row['jwt'], true);
-    logMsg("VERIFY: stored=" . json_encode($stored));
-    if (!$stored || !isset($stored['token']) || $jwt !== $stored['token']) return false;
-    return $payload;
-}
+// jwtEncode/jwtVerify/verifyUser now live in auth.php, shared with media.php.
 
 function requireAuth($pdo, $publicEndpoints) {
     global $action;
     global $CONFIG;
     if (in_array($action, $publicEndpoints)) return null;
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    logMsg("AUTH: all headers=" . json_encode(array_keys($_SERVER)));
-    $jwt = '';
-    if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
-        $jwt = $matches[1];
-    }
-    logMsg("AUTH: action=$action authHeader=" . substr($authHeader, 0, 30) . " jwt=" . ($jwt ? substr($jwt, 0, 30) . '...' : 'NONE'));
+    $jwt = bearerToken();
     $user = verifyUser($jwt, $pdo);
-    logMsg("AUTH: verifyUser result=" . ($user ? 'success sub=' . $user['sub'] : 'FAILED'));
+    logMsg("AUTH: action=$action result=" . ($user ? 'ok sub=' . $user['sub'] . ' sid=' . $user['sid'] : 'FAILED'));
     if (!$user) respond(['valid' => false, 'error' => 'Unauthorized'], 401);
     $stmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
     $stmt->execute([$user['sub']]);
@@ -366,6 +324,7 @@ function hydrateMentions($pdo, $text) {
 
 // ============== AUTH HANDLERS ==============
 function handle_login($pdo) {
+    global $CONFIG;
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     if (!$email || !$password) bad('Missing credentials', 400);
@@ -382,28 +341,62 @@ function handle_login($pdo) {
     }
     clearAttempts($pdo, $keys);
 
-    $payload = ['sub' => $user['id'], 'exp' => time() + 86400];
-    $jwt = jwtEncode($payload);
-    $stmt = $pdo->prepare('UPDATE users SET jwt = ? WHERE id = ?');
-    $stmt->execute([json_encode(['token' => $jwt]), $user['id']]);
+    // A new login adds a session; it never disturbs the ones already there,
+    // which is the whole point - the old code overwrote a single token slot
+    // and so logged every other device out.
+    $session = sessionCreate($pdo, $user['id']);
+    logMsg("LOGIN: user={$user['id']} session={$session['sessionId']}");
 
-    respond(good(['message' => 'Login successful', 'userId' => $user['id'], 'jwt' => $jwt]));
+    respond(good([
+        'message' => 'Login successful',
+        'userId' => $user['id'],
+        'jwt' => $session['jwt'],
+        'refreshToken' => $session['refreshToken'],
+        'expiresIn' => $CONFIG['session_access_ttl'] ?? 86400,
+    ]));
 }
 
+// Public: an expired access token must still be able to log itself out, and
+// the session id comes from the token's claims rather than from the caller.
 function handle_logout($pdo) {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    $jwt = '';
-    if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
-        $jwt = $matches[1];
-    }
-    if ($jwt) {
-        $payload = jwtDecode($jwt);
-        if ($payload && isset($payload['sub'])) {
-            $stmt = $pdo->prepare('UPDATE users SET jwt = ? WHERE id = ?');
-            $stmt->execute(['', $payload['sub']]);
-        }
+    $claims = jwtClaimsUnverified(bearerToken());
+    if ($claims && !empty($claims['sid'])) {
+        // Scoped by user id as well, so a forged token can't revoke someone
+        // else's session - it would have to name a real (sid, sub) pair.
+        $stmt = $pdo->prepare('UPDATE sessions SET revoked_at = ?
+            WHERE id = ? AND user_id = ? AND revoked_at IS NULL');
+        $stmt->execute([date('Y-m-d H:i:s'), $claims['sid'], $claims['sub'] ?? 0]);
+        logMsg("LOGOUT: session={$claims['sid']}");
     }
     respond(good(['message' => 'Logged out']));
+}
+
+// Public: called precisely when the access token is too old to authenticate.
+// Rate limited per token and per IP, since the refresh token is the only
+// credential involved.
+function handle_refreshToken($pdo) {
+    global $CONFIG;
+    $refreshToken = trim($_POST['refreshToken'] ?? '');
+    if (!$refreshToken) bad('Missing refresh token', 400);
+
+    // Keyed on the token's hash, never the token itself - attempt_key rows
+    // are long-lived and a raw refresh token has no business sitting in one.
+    $keys = attemptKeys('refresh', refreshTokenHash($refreshToken));
+    checkAttemptLimit($pdo, $keys);
+
+    $result = sessionRefresh($pdo, $refreshToken);
+    if (!$result) {
+        recordFailedAttempt($pdo, $keys);
+        bad('Session expired. Please log in again.', 401);
+    }
+    clearAttempts($pdo, $keys);
+
+    logMsg("REFRESH: user={$result['userId']} session={$result['sessionId']}");
+    respond(good([
+        'jwt' => $result['jwt'],
+        'userId' => $result['userId'],
+        'expiresIn' => $CONFIG['session_access_ttl'] ?? 86400,
+    ]));
 }
 
 function handle_sendOTP($pdo) {
@@ -472,6 +465,12 @@ function handle_resetPassword($pdo) {
     $hashed = password_hash($password, PASSWORD_DEFAULT);
     $stmt = $pdo->prepare('UPDATE users SET password = ?, reset_otp = NULL, reset_expires = 0 WHERE id = ?');
     $stmt->execute([$hashed, $row['id']]);
+
+    // A reset is the standard response to "someone else may have my account",
+    // so every existing login dies with the old password.
+    sessionRevokeAllForUser($pdo, $row['id']);
+    logMsg("RESET: revoked all sessions for user={$row['id']}");
+
     respond(good(['message' => 'Password reset successful! Please log in.']));
 }
 
@@ -607,6 +606,8 @@ function handle_deleteAccount($pdo, $user) {
     $pdo->prepare('DELETE FROM media WHERE user_id = ?')->execute([$uid]);
     $mediaDir = __DIR__ . '/media/' . $uid;
     if (is_dir($mediaDir)) @rmdir($mediaDir . '/image') && @rmdir($mediaDir . '/video') && @rmdir($mediaDir . '/audio') && @rmdir($mediaDir);
+    $pdo->prepare('DELETE FROM sessions WHERE user_id = ?')->execute([$uid]);
+    $pdo->prepare('DELETE FROM push_subscriptions WHERE user_id = ?')->execute([$uid]);
     $stmt = $pdo->prepare('DELETE FROM users WHERE id = ?');
     $stmt->execute([$uid]);
     respond(good(['message' => 'Account deleted successfully']));
@@ -910,8 +911,10 @@ function handle_savePushSubscription($pdo, $user) {
     if (!$endpoint || !$p256dh || !$auth) bad('Missing subscription details', 400);
     if (!filter_var($endpoint, FILTER_VALIDATE_URL)) bad('Invalid endpoint', 400);
 
-    $stmt = $pdo->prepare('INSERT OR REPLACE INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)');
-    $stmt->execute([$user['sub'], $endpoint, $p256dh, $auth, date('Y-m-d H:i:s')]);
+    // Recorded against the session that enabled it, so revoking a device
+    // also silences its notifications.
+    $stmt = $pdo->prepare('INSERT OR REPLACE INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at, session_id) VALUES (?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$user['sub'], $endpoint, $p256dh, $auth, date('Y-m-d H:i:s'), $user['sid'] ?? null]);
     respond(good(['message' => 'Push enabled']));
 }
 
@@ -1278,10 +1281,11 @@ function handle_getPostCommentCounts($pdo, $user) {
 }
 
 // ============== DISPATCHER ==============
-$PUBLIC_ENDPOINTS = ['login', 'logout', 'sendOTP', 'verifyOTP', 'resetPassword', 'sendRegisterOTP', 'verifyRegisterOTP', 'finishRegister'];
+$PUBLIC_ENDPOINTS = ['login', 'logout', 'refreshToken', 'sendOTP', 'verifyOTP', 'resetPassword', 'sendRegisterOTP', 'verifyRegisterOTP', 'finishRegister'];
 
 $HANDLERS = [
-    'login' => 'handle_login', 'logout' => 'handle_logout', 'sendOTP' => 'handle_sendOTP',
+    'login' => 'handle_login', 'logout' => 'handle_logout', 'refreshToken' => 'handle_refreshToken',
+    'sendOTP' => 'handle_sendOTP',
     'verifyOTP' => 'handle_verifyOTP', 'resetPassword' => 'handle_resetPassword',
     'sendRegisterOTP' => 'handle_sendRegisterOTP', 'verifyRegisterOTP' => 'handle_verifyRegisterOTP',
     'finishRegister' => 'handle_finishRegister', 'deleteAccount' => 'handle_deleteAccount',

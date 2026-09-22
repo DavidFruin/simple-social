@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/schema.php';
+require_once __DIR__ . '/auth.php';
 
 ob_start();
 ini_set('display_errors', 0);
@@ -48,41 +50,18 @@ function db() {
         foreach ($cols as $c) if ($c['name'] === 'post_id') $has = true;
         if (!$has) $pdo->exec('ALTER TABLE media ADD COLUMN post_id TEXT');
     } catch (Exception $e) {}
+    ensureSharedSchema($pdo);
     return $pdo;
 }
 
-function jwtDecode($jwt) {
-    $parts = explode('.', $jwt);
-    if (count($parts) !== 3) return false;
-    $base64 = str_replace(['-', '_'], ['+', '/'], $parts[1]);
-    $pad = strlen($base64) % 4;
-    if ($pad) $base64 .= str_repeat('=', 4 - $pad);
-    $payload = json_decode(base64_decode($base64), true);
-    if (!$payload || !isset($payload['sub'])) return false;
-    if (isset($payload['exp']) && time() > $payload['exp']) return false;
-    return $payload;
-}
-
-function verifyUser($jwt, $pdo) {
-    $payload = jwtDecode($jwt);
-    if (!$payload || !isset($payload['sub'])) return false;
-    $stmt = $pdo->prepare('SELECT jwt FROM users WHERE id = ?');
-    $stmt->execute([$payload['sub']]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row || !$row['jwt']) return false;
-    $stored = json_decode($row['jwt'], true);
-    if (!$stored || !isset($stored['token']) || $jwt !== $stored['token']) return false;
-    return $payload;
-}
+// jwtVerify/verifyUser live in auth.php, shared with api.php - this file
+// used to carry its own near-identical copies, which is exactly how the two
+// would have drifted once session checks were added to only one of them.
 
 function requireAuth() {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    $jwt = '';
-    if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
-        $jwt = $matches[1];
-    }
+    $jwt = bearerToken();
     if (!$jwt) bad('Unauthorized', 401);
-    
+
     $pdo = db();
     $user = verifyUser($jwt, $pdo);
     if (!$user) bad('Unauthorized', 401);
