@@ -656,7 +656,11 @@ function handle_getMyFollows($pdo, $user) {
 function handle_getNotifications($pdo, $user) {
     $offset = isset($_POST['offset']) ? (int)$_POST['offset'] : 0;
     $limit = 25;
-    $stmt = $pdo->prepare('SELECT n.id, n.recipient_id, n.actor_id, COALESCE(u.email, n.actor_email) AS actor_email, n.type, n.post_id, n.created_at FROM notifications n LEFT JOIN users u ON n.actor_id = u.id WHERE n.recipient_id = ? AND n.actor_id != ? ORDER BY n.created_at DESC LIMIT ? OFFSET ?');
+    // Every other type can't target yourself in the first place (you can't
+    // follow/like/comment-notify yourself), but a mention can - self-mentions
+    // are meant to notify like any other, so they're exempted here rather
+    // than excluded by the general actor_id != recipient_id noise filter.
+    $stmt = $pdo->prepare('SELECT n.id, n.recipient_id, n.actor_id, COALESCE(u.email, n.actor_email) AS actor_email, n.type, n.post_id, n.created_at FROM notifications n LEFT JOIN users u ON n.actor_id = u.id WHERE n.recipient_id = ? AND (n.actor_id != ? OR n.type = \'mention\') ORDER BY n.created_at DESC LIMIT ? OFFSET ?');
     $stmt->execute([$user['sub'], $user['sub'], $limit, $offset]);
     respond(good(['notifications' => $stmt->fetchAll(PDO::FETCH_ASSOC)]));
 }
@@ -667,10 +671,10 @@ function handle_getUnseenNotificationCount($pdo, $user) {
     $lastSeen = $stmt->fetchColumn();
 
     if (!$lastSeen) {
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND actor_id != ?');
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND (actor_id != ? OR type = \'mention\')');
         $stmt->execute([$user['sub'], $user['sub']]);
     } else {
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND actor_id != ? AND created_at > ?');
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND (actor_id != ? OR type = \'mention\') AND created_at > ?');
         $stmt->execute([$user['sub'], $user['sub'], $lastSeen]);
     }
 
