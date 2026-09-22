@@ -35,6 +35,13 @@ const SettingsPage = {
         </div>
 
         <div class="settings-section">
+          <h2>Devices</h2>
+          <p class="settings-note">Everywhere you're signed in. Signing out a device takes effect immediately and also stops its notifications.</p>
+          <div id="sessions-list" class="sessions-list">Loading&hellip;</div>
+          <button type="button" id="revoke-all-btn" class="btn btn-secondary hidden">Sign out all other devices</button>
+        </div>
+
+        <div class="settings-section">
           <h2>Info</h2>
           <ul class="settings-links">
             <li><a href="/about.html">About</a></li>
@@ -82,6 +89,90 @@ const SettingsPage = {
     }
 
     this.initPushSection();
+    this.loadSessions();
+  },
+
+  // ============== DEVICES ==============
+  async loadSessions() {
+    const list = document.getElementById('sessions-list');
+    const revokeAllBtn = document.getElementById('revoke-all-btn');
+    if (!list) return;
+
+    try {
+      const result = await api.getSessions();
+      this.renderSessions(result.sessions || []);
+      // Only worth offering when there's actually something else to sign out.
+      const others = (result.sessions || []).filter(s => !s.isCurrent).length;
+      revokeAllBtn?.classList.toggle('hidden', others === 0);
+      revokeAllBtn?.addEventListener('click', this.handleRevokeAll.bind(this), { once: true });
+    } catch (err) {
+      list.innerHTML = `<p class="settings-note">Couldn't load your devices: ${escapeHtml(err.message)}</p>`;
+    }
+  },
+
+  renderSessions(sessions) {
+    const list = document.getElementById('sessions-list');
+    if (!list) return;
+
+    if (!sessions.length) {
+      list.innerHTML = '<p class="settings-note">No active sessions.</p>';
+      return;
+    }
+
+    list.innerHTML = sessions.map(s => `
+      <div class="session-item" data-session-id="${escapeHtml(s.id)}">
+        <div class="session-info">
+          <span class="session-device">${escapeHtml(s.deviceName)}${s.isCurrent ? ' <span class="session-current">this device</span>' : ''}</span>
+          <span class="session-meta">Last active ${escapeHtml(relativeTime(s.lastUsedAt || s.createdAt))}</span>
+        </div>
+        ${s.isCurrent ? '' : `<button type="button" class="btn btn-secondary btn-revoke" data-session-id="${escapeHtml(s.id)}">Sign out</button>`}
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.btn-revoke').forEach(btn => {
+      btn.addEventListener('click', this.handleRevoke.bind(this));
+    });
+  },
+
+  async handleRevoke(e) {
+    const btn = e.currentTarget;
+    const sessionId = btn.dataset.sessionId;
+    btn.disabled = true;
+    btn.textContent = 'Signing out...';
+
+    try {
+      await api.revokeSession(sessionId);
+      showSuccess('Device signed out');
+      this.loadSessions();
+    } catch (err) {
+      showError(err.message);
+      btn.disabled = false;
+      btn.textContent = 'Sign out';
+    }
+  },
+
+  async handleRevokeAll(e) {
+    const btn = e.currentTarget;
+    if (!confirm('Sign out every device except this one?')) {
+      // The listener was registered with { once: true }, so it has to be
+      // re-armed after a cancel or the button goes dead.
+      btn.addEventListener('click', this.handleRevokeAll.bind(this), { once: true });
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing out...';
+
+    try {
+      const result = await api.revokeAllOtherSessions();
+      showSuccess(result.revoked === 1 ? '1 device signed out' : `${result.revoked} devices signed out`);
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign out all other devices';
+      this.loadSessions();
+    }
   },
 
   // Push is per-device, not per-account: whether it's on depends on this

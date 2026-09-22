@@ -399,6 +399,54 @@ function handle_refreshToken($pdo) {
     ]));
 }
 
+// The device list. Deliberately never exposes refresh_hash - the whole
+// point of hashing it is that not even this endpoint can hand it back.
+function handle_getSessions($pdo, $user) {
+    $stmt = $pdo->prepare('SELECT id, device_name, created_at, last_used_at
+        FROM sessions
+        WHERE user_id = ? AND revoked_at IS NULL AND expires_at >= ?
+        ORDER BY COALESCE(last_used_at, created_at) DESC');
+    $stmt->execute([$user['sub'], date('Y-m-d H:i:s')]);
+
+    $sessions = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $sessions[] = [
+            'id' => $row['id'],
+            'deviceName' => $row['device_name'] ?: 'Unknown device',
+            'createdAt' => $row['created_at'],
+            'lastUsedAt' => $row['last_used_at'],
+            'isCurrent' => $row['id'] === $user['sid'],
+        ];
+    }
+    respond(good(['sessions' => $sessions]));
+}
+
+function handle_revokeSession($pdo, $user) {
+    $sessionId = trim($_POST['sessionId'] ?? '');
+    if (!$sessionId) bad('Missing session id', 400);
+
+    // Scoped to the caller, so a session id belonging to someone else simply
+    // matches nothing rather than revoking their login.
+    $stmt = $pdo->prepare('SELECT id FROM sessions WHERE id = ? AND user_id = ?');
+    $stmt->execute([$sessionId, $user['sub']]);
+    if (!$stmt->fetchColumn()) bad('Session not found', 404);
+
+    sessionRevoke($pdo, $sessionId);
+    logMsg("REVOKE: user={$user['sub']} session=$sessionId");
+    respond(good(['message' => 'Device signed out', 'wasCurrent' => $sessionId === $user['sid']]));
+}
+
+function handle_revokeAllOtherSessions($pdo, $user) {
+    $stmt = $pdo->prepare('SELECT id FROM sessions
+        WHERE user_id = ? AND id != ? AND revoked_at IS NULL AND expires_at >= ?');
+    $stmt->execute([$user['sub'], $user['sid'], date('Y-m-d H:i:s')]);
+    $others = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    foreach ($others as $id) sessionRevoke($pdo, $id);
+    logMsg("REVOKE ALL: user={$user['sub']} revoked=" . count($others));
+    respond(good(['message' => 'Other devices signed out', 'revoked' => count($others)]));
+}
+
 function handle_sendOTP($pdo) {
     $email = trim($_POST['email'] ?? '');
     if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) bad('Valid email required', 400);
@@ -1306,6 +1354,8 @@ $HANDLERS = [
     'getVapidPublicKey' => 'handle_getVapidPublicKey',
     'savePushSubscription' => 'handle_savePushSubscription',
     'deletePushSubscription' => 'handle_deletePushSubscription',
+    'getSessions' => 'handle_getSessions', 'revokeSession' => 'handle_revokeSession',
+    'revokeAllOtherSessions' => 'handle_revokeAllOtherSessions',
     'log' => 'handle_log_request'
 ];
 

@@ -130,6 +130,27 @@ function displayEmail(email) {
   return (isYou ? '(you) ' : '') + escapeHtml(email);
 }
 
+// "3 minutes ago" rather than a date. Used where recency is the point and
+// the exact moment isn't - the device list, mainly.
+function relativeTime(timestamp) {
+  if (!timestamp) return 'unknown';
+  const then = new Date(String(timestamp).replace(' ', 'T'));
+  if (isNaN(then.getTime())) return 'unknown';
+
+  const seconds = Math.floor((Date.now() - then.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+
+  // Largest unit that fits wins. Sessions top out at 30 days, so weeks is
+  // as coarse as this ever needs to get.
+  const units = [['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+  for (const [label, size] of units) {
+    if (seconds < size) continue;
+    const count = Math.floor(seconds / size);
+    return `${count} ${label}${count === 1 ? '' : 's'} ago`;
+  }
+  return 'just now';
+}
+
 const NO_DATE_PLACEHOLDER = '0000-00-00 00:00:00';
 
 function formatTimestamp(timestamp) {
@@ -239,4 +260,5 @@ window.escapeHtml = escapeHtml;
 window.linkifyMentions = linkifyMentions;
 window.displayEmail = displayEmail;
 window.formatTimestamp = formatTimestamp;
+window.relativeTime = relativeTime;
 window.createMediaHtml = createMediaHtml;

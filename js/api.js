@@ -246,6 +246,19 @@ const API = {
     return this.call('deletePushSubscription', { endpoint });
   },
 
+  // ============== SESSIONS ==============
+  async getSessions() {
+    return this.call('getSessions', {});
+  },
+
+  async revokeSession(sessionId) {
+    return this.call('revokeSession', { sessionId });
+  },
+
+  async revokeAllOtherSessions() {
+    return this.call('revokeAllOtherSessions', {});
+  },
+
   // ============== POSTS ==============
   async post(postText, mediaUrl = null) {
     return this.call('post', { postText, mediaUrl });
