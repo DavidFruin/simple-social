@@ -402,6 +402,7 @@ function handle_refreshToken($pdo) {
 // The device list. Deliberately never exposes refresh_hash - the whole
 // point of hashing it is that not even this endpoint can hand it back.
 function handle_getSessions($pdo, $user) {
+    global $CONFIG;
     $stmt = $pdo->prepare('SELECT id, device_name, created_at, last_used_at
         FROM sessions
         WHERE user_id = ? AND revoked_at IS NULL AND expires_at >= ?
@@ -418,7 +419,9 @@ function handle_getSessions($pdo, $user) {
             'isCurrent' => $row['id'] === $user['sid'],
         ];
     }
-    respond(good(['sessions' => $sessions]));
+    // Sent rather than hardcoded in the UI so the limit shown always matches
+    // the one actually enforced.
+    respond(good(['sessions' => $sessions, 'maxSessions' => $CONFIG['session_max_per_user'] ?? 10]));
 }
 
 function handle_revokeSession($pdo, $user) {

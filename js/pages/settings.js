@@ -37,6 +37,7 @@ const SettingsPage = {
         <div class="settings-section">
           <h2>Devices</h2>
           <p class="settings-note">Everywhere you're signed in. Signing out a device takes effect immediately and also stops its notifications.</p>
+          <p id="sessions-limit" class="settings-note"></p>
           <div id="sessions-list" class="sessions-list">Loading&hellip;</div>
           <button type="button" id="revoke-all-btn" class="btn btn-secondary hidden">Sign out all other devices</button>
         </div>
@@ -100,14 +101,26 @@ const SettingsPage = {
 
     try {
       const result = await api.getSessions();
-      this.renderSessions(result.sessions || []);
+      const sessions = result.sessions || [];
+      this.renderSessions(sessions);
+      this.renderSessionLimit(sessions.length, result.maxSessions);
       // Only worth offering when there's actually something else to sign out.
-      const others = (result.sessions || []).filter(s => !s.isCurrent).length;
+      const others = sessions.filter(s => !s.isCurrent).length;
       revokeAllBtn?.classList.toggle('hidden', others === 0);
       revokeAllBtn?.addEventListener('click', this.handleRevokeAll.bind(this), { once: true });
     } catch (err) {
       list.innerHTML = `<p class="settings-note">Couldn't load your devices: ${escapeHtml(err.message)}</p>`;
     }
+  },
+
+  // The count and the limit both come from the server, so this can't drift
+  // from what's actually enforced if the cap is changed in config.php.
+  renderSessionLimit(count, max) {
+    const el = document.getElementById('sessions-limit');
+    if (!el || !max) return;
+    el.textContent = `You can be signed in on up to ${max} devices at once `
+      + `(currently ${count}). Signing in on another one after that signs out `
+      + `whichever device you've used least recently.`;
   },
 
   renderSessions(sessions) {
