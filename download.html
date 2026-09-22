@@ -56,7 +56,7 @@
                         <button class="copy-btn" data-copy="cd simple-social-cli && make">Copy</button>
                     </div>
 
-                    <p>Then run it with <code>./simple-social-cli --help</code> from inside that folder.</p>
+                    <p>Then run it with <code>./simple-social-cli --help</code> from inside that folder. To call it as <code>sscli</code> from anywhere instead, run <code>sudo make install</code> &mdash; it copies the built binary to <code>/usr/local/bin/sscli</code> (<code>sudo make uninstall</code> to remove it).</p>
 
                     <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
 
@@ -81,7 +81,9 @@
                         <button class="copy-btn" data-copy="cd simple-social-cli-interactive && make">Copy</button>
                     </div>
 
-                    <p>Then run it with <code>./simple-social-cli-interactive</code> from inside that folder. The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
+                    <p>Then run it with <code>./simple-social-cli-interactive</code> from inside that folder. To call it as <code>ssic</code> from anywhere instead, run <code>sudo make install</code> &mdash; it copies the built binary to <code>/usr/local/bin/ssic</code> (<code>sudo make uninstall</code> to remove it).</p>
+
+                    <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
 
                     <h2>TUI</h2>
                     <p>A full-screen terminal interface you navigate with the keyboard. It's a standalone download &mdash; you don't need the CLI above unless you want it too. Debian and Ubuntu only for now, same as the CLI.</p>
@@ -104,7 +106,9 @@
                         <button class="copy-btn" data-copy="cd simple-social-tui && make">Copy</button>
                     </div>
 
-                    <p>Then run it with <code>./simple-social-tui</code> from inside that folder. The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again. If you're already logged in from the CLI or Interactive CLI, it opens straight to your feed &mdash; all three tools share the same session. Otherwise you'll land on a login screen where you can log in, register, or reset a forgotten password.</p>
+                    <p>Then run it with <code>./simple-social-tui</code> from inside that folder. To call it as <code>sstui</code> from anywhere instead, run <code>sudo make install</code> &mdash; it copies the built binary to <code>/usr/local/bin/sstui</code> (<code>sudo make uninstall</code> to remove it). If you're already logged in from the CLI or Interactive CLI, it opens straight to your feed &mdash; all three tools share the same session. Otherwise you'll land on a login screen where you can log in, register, or reset a forgotten password.</p>
+
+                    <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
                 </div>
             </div>
         </main>
