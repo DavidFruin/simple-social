@@ -13,9 +13,43 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', () => {
-  // Intentionally not intercepted -- every request goes straight to the
-  // network. A fetch handler still has to exist for some install checks.
+// Nothing is cached for offline use -- this app is all live data. What this
+// handler does is the opposite: it stops the browser serving *stale* app
+// code from its own HTTP cache. Deploys don't change filenames, so a device
+// could hold one file from before a deploy and another from after, which has
+// repeatedly produced bugs that look like code bugs (a script that never
+// loads, or CSS missing a rule the JS depends on).
+//
+// `cache: 'no-cache'` still revalidates rather than re-downloading: unchanged
+// files come back 304, so this costs a conditional request, not bandwidth.
+// Only same-origin HTML/JS/CSS is touched -- media, api.php and everything
+// else keep their normal behaviour.
+function isAppCode(request, url) {
+  if (request.method !== 'GET') return false;
+  if (url.origin !== self.location.origin) return false;
+  if (request.mode === 'navigate') return true;
+  return /\.(js|css)$/i.test(url.pathname);
+}
+
+self.addEventListener('fetch', (event) => {
+  let url;
+  try {
+    url = new URL(event.request.url);
+  } catch (e) {
+    return;
+  }
+  if (!isAppCode(event.request, url)) return;
+
+  // Re-fetched by URL rather than by passing the Request along: constructing
+  // a request from a navigation request throws, and this only ever runs for
+  // same-origin GETs where the URL is all that matters.
+  event.respondWith(
+    fetch(url.href, { cache: 'no-cache', credentials: 'same-origin' })
+      // Offline, or the revalidation itself failed -- fall back to the normal
+      // request so a flaky connection degrades to "possibly stale" instead of
+      // a dead page.
+      .catch(() => fetch(event.request))
+  );
 });
 
 // The home-screen badge is meant to reflect the notifications page's unseen
