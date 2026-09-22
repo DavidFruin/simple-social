@@ -61,35 +61,41 @@
                     <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
 
                     <h2>Interactive CLI</h2>
-                    <p>A guided command-line client that prompts you for each step. It's a separate program that uses the CLI above, so build the CLI first, then run these from the <strong>same folder</strong> you ran the CLI's <code>git clone</code> in (not inside the <code>simple-social-cli</code> folder). Debian and Ubuntu only for now, same as the CLI.</p>
+                    <p>A guided command-line client that prompts you for each step. It's a standalone download &mdash; you don't need the CLI above unless you want it too. Builds from source on <strong>Debian and Ubuntu only</strong> for now (Arch and Nix support is coming soon).</p>
 
-                    <p>1. Clone the repo:</p>
+                    <p>1. Install the build tools:</p>
                     <div class="code-block">
-                        <pre><code>git clone https://github.com/DavidFruin/simple-social-cli-interactive.git</code></pre>
-                        <button class="copy-btn" data-copy="git clone https://github.com/DavidFruin/simple-social-cli-interactive.git">Copy</button>
+                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential</code></pre>
+                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential">Copy</button>
                     </div>
 
-                    <p>2. Build it:</p>
+                    <p>2. Clone the repo (<code>--recursive</code> also fetches the small library it's built on):</p>
+                    <div class="code-block">
+                        <pre><code>git clone --recursive https://github.com/DavidFruin/simple-social-cli-interactive.git</code></pre>
+                        <button class="copy-btn" data-copy="git clone --recursive https://github.com/DavidFruin/simple-social-cli-interactive.git">Copy</button>
+                    </div>
+
+                    <p>3. Build it:</p>
                     <div class="code-block">
                         <pre><code>cd simple-social-cli-interactive &amp;&amp; make</code></pre>
                         <button class="copy-btn" data-copy="cd simple-social-cli-interactive && make">Copy</button>
                     </div>
 
-                    <p>Then run it with <code>./simple-social-cli-interactive</code> from inside that folder.</p>
+                    <p>Then run it with <code>./simple-social-cli-interactive</code> from inside that folder. The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
 
                     <h2>TUI</h2>
-                    <p>A full-screen terminal interface you navigate with the keyboard. It's a separate program that uses the CLI above, so build the CLI first, then run these from the <strong>same folder</strong> you ran the CLI's <code>git clone</code> in (not inside the <code>simple-social-cli</code> folder). Debian and Ubuntu only for now, same as the CLI.</p>
+                    <p>A full-screen terminal interface you navigate with the keyboard. It's a standalone download &mdash; you don't need the CLI above unless you want it too. Debian and Ubuntu only for now, same as the CLI.</p>
 
-                    <p>1. Install ncurses:</p>
+                    <p>1. Install the build tools and ncurses:</p>
                     <div class="code-block">
-                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y libncurses-dev</code></pre>
-                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y libncurses-dev">Copy</button>
+                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libncurses-dev</code></pre>
+                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libncurses-dev">Copy</button>
                     </div>
 
-                    <p>2. Clone the repo:</p>
+                    <p>2. Clone the repo (<code>--recursive</code> also fetches the small library it's built on):</p>
                     <div class="code-block">
-                        <pre><code>git clone https://github.com/DavidFruin/simple-social-tui.git</code></pre>
-                        <button class="copy-btn" data-copy="git clone https://github.com/DavidFruin/simple-social-tui.git">Copy</button>
+                        <pre><code>git clone --recursive https://github.com/DavidFruin/simple-social-tui.git</code></pre>
+                        <button class="copy-btn" data-copy="git clone --recursive https://github.com/DavidFruin/simple-social-tui.git">Copy</button>
                     </div>
 
                     <p>3. Build it:</p>
@@ -98,7 +104,7 @@
                         <button class="copy-btn" data-copy="cd simple-social-tui && make">Copy</button>
                     </div>
 
-                    <p>Then run it with <code>./simple-social-tui</code> from inside that folder. If you're already logged in from the CLI or Interactive CLI, it opens straight to your feed &mdash; all three tools share the same session. Otherwise you'll land on a login screen where you can log in, register, or reset a forgotten password.</p>
+                    <p>Then run it with <code>./simple-social-tui</code> from inside that folder. The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again. If you're already logged in from the CLI or Interactive CLI, it opens straight to your feed &mdash; all three tools share the same session. Otherwise you'll land on a login screen where you can log in, register, or reset a forgotten password.</p>
                 </div>
             </div>
         </main>
