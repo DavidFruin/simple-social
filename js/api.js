@@ -197,24 +197,45 @@ const API = {
       headers['Authorization'] = 'Bearer ' + this.jwt;
     }
 
+    let response;
     try {
-      const response = await fetch('/media.php', {
+      response = await fetch('/media.php', {
         method: 'POST',
         headers,
         body: formData
       });
-
-      const json = await response.json();
-      if (!response.ok || !json.valid) {
-        const errorMsg = json.message || json.error || 'HTTP ' + response.status;
-        throw new Error(errorMsg);
-      }
-      return json;
     } catch (error) {
+      // fetch() itself only throws for a connection that never happened at
+      // all (offline, DNS failure, etc.) - a request the server responded to
+      // always reaches the code below instead, even with an error status.
       console.error('Upload Error:', error);
       if (typeof Logger !== 'undefined') Logger.error('Upload: ' + error.message);
-      throw error;
+      throw new Error('Could not reach the server. Check your connection and try again.');
     }
+
+    let json;
+    try {
+      json = await response.json();
+    } catch (parseError) {
+      // The webserver rejected the request before our PHP ever ran (most
+      // often a proxy/PHP post_max_size limit on a large video), so the body
+      // is an HTML error page instead of JSON. response.status still reflects
+      // what happened.
+      const msg = response.status === 413
+        ? 'That file is too large for the server to accept.'
+        : `Upload failed (server error ${response.status}). Please try again.`;
+      console.error('Upload Error: non-JSON response, status=' + response.status);
+      if (typeof Logger !== 'undefined') Logger.error('Upload: non-JSON response ' + response.status);
+      throw new Error(msg);
+    }
+
+    if (!response.ok || !json.valid) {
+      const errorMsg = json.message || json.error || 'HTTP ' + response.status;
+      console.error('Upload Error:', errorMsg);
+      if (typeof Logger !== 'undefined') Logger.error('Upload: ' + errorMsg);
+      throw new Error(errorMsg);
+    }
+    return json;
   },
 
   async deleteMedia(mediaId) {

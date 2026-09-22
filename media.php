@@ -370,25 +370,48 @@ function handle_uploadMedia() {
     
     logMsg("uploadMedia: user=$uid files=" . json_encode($_FILES));
     
-    if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-        bad('No file uploaded', 400);
+    if (!isset($_FILES['file'])) {
+        bad('No file was selected', 400);
     }
-    
+
+    // PHP's own upload_max_filesize/post_max_size reject an oversized file
+    // before it ever reaches this code, so that's the most likely cause here
+    // -- but each error code is a different situation, not all size-related.
+    $uploadError = $_FILES['file']['error'];
+    if ($uploadError !== UPLOAD_ERR_OK) {
+        logMsg("uploadMedia ERROR: PHP upload error code $uploadError");
+        switch ($uploadError) {
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                bad('That file is larger than the server accepts. Try a smaller file.', 400);
+            case UPLOAD_ERR_PARTIAL:
+                bad('The upload was interrupted partway through. Check your connection and try again.', 400);
+            case UPLOAD_ERR_NO_FILE:
+                bad('No file was selected', 400);
+            default:
+                bad('The server could not accept that upload. Please try again.', 500);
+        }
+    }
+
     $file = $_FILES['file'];
     $tmpPath = $file['tmp_name'];
     // Browsers may add codec parameters, e.g. "video/mp4;codecs=avc1".
     $mimeType = strtolower(trim(explode(';', $file['type'])[0]));
     $fileSize = $file['size'];
     $fileName = $file['name'];
-    
+
     logMsg("uploadMedia: file=$fileName mime=$mimeType size=$fileSize");
-    
+
     $mediaType = getMediaType($mimeType);
-    if (!$mediaType) bad('Invalid file type. Allowed: jpg, png, gif, webp, mov, mp4, m4v, wav, mp3', 400);
-    
+    if (!$mediaType) {
+        $shownType = $mimeType !== '' ? $mimeType : 'unknown';
+        bad("That file type ($shownType) isn't supported. Allowed: jpg, png, gif, webp, mov, mp4, m4v, wav, mp3", 400);
+    }
+
     if ($fileSize > $maxSizes[$mediaType]) {
-        $maxMb = $maxSizes[$mediaType] / (1024 * 1024);
-        bad("File too large. Max: $maxMb MB", 400);
+        $maxMb = round($maxSizes[$mediaType] / (1024 * 1024), 1);
+        $gotMb = round($fileSize / (1024 * 1024), 1);
+        bad("That $mediaType is {$gotMb}MB - the max is {$maxMb}MB.", 400);
     }
     
     $timestamp = date('YmdHis');
@@ -405,7 +428,7 @@ function handle_uploadMedia() {
     
     if (!move_uploaded_file($tmpPath, $tempInput)) {
         logMsg("uploadMedia ERROR: move_uploaded_file failed. tmpPath=$tmpPath, tempInput=$tempInput");
-        bad('Failed to process upload', 500);
+        bad('Could not save the upload on the server. Please try again.', 500);
     }
     
     logMsg("uploadMedia: tempInput=$tempInput exists=" . (file_exists($tempInput) ? "yes" : "no"));
@@ -434,7 +457,7 @@ function handle_uploadMedia() {
     }
     
     @unlink($tempInput);
-    if (!$ext) bad("Failed to process $mediaType", 500);
+    if (!$ext) bad("Couldn't process that $mediaType - it may be corrupted or in an unsupported format.", 500);
     
     $filename = "{$base}.{$ext}";
     $pdo = db();
