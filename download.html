@@ -50,13 +50,13 @@
                         <button class="copy-btn" data-copy="git clone https://github.com/DavidFruin/simple-social-cli.git">Copy</button>
                     </div>
 
-                    <p>3. Build it:</p>
+                    <p>3. Build and install it:</p>
                     <div class="code-block">
-                        <pre><code>cd simple-social-cli &amp;&amp; make</code></pre>
-                        <button class="copy-btn" data-copy="cd simple-social-cli && make">Copy</button>
+                        <pre><code>cd simple-social-cli &amp;&amp; sudo make install</code></pre>
+                        <button class="copy-btn" data-copy="cd simple-social-cli && sudo make install">Copy</button>
                     </div>
 
-                    <p>Then run it with <code>./simple-social-cli --help</code> from inside that folder. To call it as <code>sscli</code> from anywhere instead, run <code>sudo make install</code> &mdash; it copies the built binary to <code>/usr/local/bin/sscli</code> (<code>sudo make uninstall</code> to remove it).</p>
+                    <p>This builds it and copies it to <code>/usr/local/bin/sscli</code>, so you can run it as <code>sscli</code> from anywhere (<code>sudo make uninstall</code> to remove it). If you'd rather not install it system-wide, run <code>cd simple-social-cli &amp;&amp; make</code> instead, then use it as <code>./simple-social-cli --help</code> from inside that folder.</p>
 
                     <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
 
@@ -75,13 +75,13 @@
                         <button class="copy-btn" data-copy="git clone --recursive https://github.com/DavidFruin/simple-social-cli-interactive.git">Copy</button>
                     </div>
 
-                    <p>3. Build it:</p>
+                    <p>3. Build and install it:</p>
                     <div class="code-block">
-                        <pre><code>cd simple-social-cli-interactive &amp;&amp; make</code></pre>
-                        <button class="copy-btn" data-copy="cd simple-social-cli-interactive && make">Copy</button>
+                        <pre><code>cd simple-social-cli-interactive &amp;&amp; sudo make install</code></pre>
+                        <button class="copy-btn" data-copy="cd simple-social-cli-interactive && sudo make install">Copy</button>
                     </div>
 
-                    <p>Then run it with <code>./simple-social-cli-interactive</code> from inside that folder. To call it as <code>sswiz</code> from anywhere instead, run <code>sudo make install</code> &mdash; it copies the built binary to <code>/usr/local/bin/sswiz</code> (<code>sudo make uninstall</code> to remove it).</p>
+                    <p>This builds it and copies it to <code>/usr/local/bin/sswiz</code>, so you can run it as <code>sswiz</code> from anywhere (<code>sudo make uninstall</code> to remove it). If you'd rather not install it system-wide, run <code>cd simple-social-cli-interactive &amp;&amp; make</code> instead, then use it as <code>./simple-social-cli-interactive</code> from inside that folder.</p>
 
                     <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
 
@@ -100,13 +100,13 @@
                         <button class="copy-btn" data-copy="git clone --recursive https://github.com/DavidFruin/simple-social-tui.git">Copy</button>
                     </div>
 
-                    <p>3. Build it:</p>
+                    <p>3. Build and install it:</p>
                     <div class="code-block">
-                        <pre><code>cd simple-social-tui &amp;&amp; make</code></pre>
-                        <button class="copy-btn" data-copy="cd simple-social-tui && make">Copy</button>
+                        <pre><code>cd simple-social-tui &amp;&amp; sudo make install</code></pre>
+                        <button class="copy-btn" data-copy="cd simple-social-tui && sudo make install">Copy</button>
                     </div>
 
-                    <p>Then run it with <code>./simple-social-tui</code> from inside that folder. To call it as <code>sstui</code> from anywhere instead, run <code>sudo make install</code> &mdash; it copies the built binary to <code>/usr/local/bin/sstui</code> (<code>sudo make uninstall</code> to remove it). If you're already logged in from the CLI or Interactive CLI, it opens straight to your feed &mdash; all three tools share the same session. Otherwise you'll land on a login screen where you can log in, register, or reset a forgotten password.</p>
+                    <p>This builds it and copies it to <code>/usr/local/bin/sstui</code>, so you can run it as <code>sstui</code> from anywhere (<code>sudo make uninstall</code> to remove it). If you'd rather not install it system-wide, run <code>cd simple-social-tui &amp;&amp; make</code> instead, then use it as <code>./simple-social-tui</code> from inside that folder. The first time you run it you'll land on a login screen, where you can log in, register, or reset a forgotten password. Each of the three terminal tools signs in on its own, so logging into one doesn't log you into the others.</p>
 
                     <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
                 </div>
