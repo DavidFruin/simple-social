@@ -1,8 +1,11 @@
 # Simple Social — Architecture Map
 
-> **Version:** 2026-09-15 (post Phase 0/A/M + CLI Phases B/C)  
-> **Live:** `https://dev.davidfruin.com` → docroot `public_html/`  
-> **Repos:** `simple-social` (web + API) + `simple-social-cli` (alternate IO)
+> **Version:** 2026-09-23
+> **Live:** `https://app.davidfruin.com` (production) and `https://dev.davidfruin.com` (staging). Both are git checkouts of this repo, and in both the repo root *is* the docroot.
+> **Repos:** `simple-social` (web + API), `simple-social-cli`, `simple-social-tui`, `simple-social-cli-interactive`
+
+Numbers that can be tuned live in `config.php` and are referenced by name here
+rather than copied, so this document can't drift out of step with them.
 
 ---
 
@@ -10,312 +13,314 @@
 
 | Principle | How it manifests |
 |-----------|------------------|
-| **No framework SPA** | Vanilla JS modules attached to `window`, no build step, no bundler. `index.html` loads every script with `<script src>` and the hash router does client navigation. |
-| **Single-file API** | `api.php` is a 40 kB flat dispatcher (~36 actions) with a 3-level indentation rule. Not MVC — one `$HANDLERS` table, one `db()` factory, one `respond()`. Easy to `scp` and `grep`. |
-| **SQLite + JSON blobs** | `users.posts` and `users.follows` are JSON arrays inside a single `users` row. `notifications` and `comments` are real normalized tables. Hybrid: “document inside relational”. |
-| **Content-addressed IDs** | Post ID = `"{ownerId}.{unixtime}"`. Owner is derivable by `explode('.', $postId)[0]`. Keeps routing cheap; collisions possible within same second (known). |
-| **Stateless auth, stateful revocation** | JWT (HS256) in `Authorization: Bearer`, but the live token is mirrored into `users.jwt` so `verifyUser()` can revoke by string compare. Rotation forces `UPDATE users SET jwt=''`. |
-| **Bare JSON over form bodies** | Every API call is `POST action=foo&param=bar` with `application/x-www-form-urlencoded`. Responses are `{"valid":true,…}` with `JSON_UNESCAPED_UNICODE`. CLI mirrors this. |
-| **Bare schema for scripting** | CLI `--json` emits the same bare objects the API uses (`{"posts":[…]}`, `{"id":1,…}`), not an envelope. Stdout is machine, stderr is human — `cli --json … | jq` works. |
+| **No framework SPA** | Vanilla JS attached to `window`, no build step, no bundler. `app.html` loads every script with `<script src>` and a hash router does client navigation. |
+| **Single-file API** | `api.php` is one flat dispatcher (45 actions). Not MVC — one `$HANDLERS` table, one `db()` factory, one `respond()`. Easy to `scp` and `grep`. |
+| **SQLite + JSON blobs** | `users.posts` and `users.follows` are JSON arrays inside a single `users` row. `comments`, `notifications`, `media`, `sessions` and `push_subscriptions` are real tables. Hybrid: "document inside relational". |
+| **Composite post IDs** | Post ID is `"{ownerId}.{unixtime}"`, so the owner falls out of `explode('.', $postId)[0]` with no lookup. Cheap, and the cause of a real bug — see §8. |
+| **Sessions, not a single token** | A JWT (HS256) in `Authorization: Bearer` carries a `sid` claim naming a row in `sessions`. Signature is verified properly, and revocation is per-device. |
+| **Form bodies, JSON replies** | Every call is `POST action=foo&param=bar` as `application/x-www-form-urlencoded`. Replies are `{"valid":true,…}` with `JSON_UNESCAPED_UNICODE`. The terminal clients speak the same protocol. |
+| **Lazy migrations** | Every entry point runs `CREATE TABLE IF NOT EXISTS` plus `PRAGMA table_info` guarded `ALTER TABLE` on each request. No migration runner, no deploy step beyond `git pull`. |
 
 ---
 
-## 2. File Structure
+## 2. File structure
 
-### 2.1 Server layout (actual on `ns1`)
+### 2.1 Server layout
 
 ```
-/home/davidfruin/domains/dev.davidfruin.com/
-├── private/                     # OUTSIDE docroot — not web-reachable
-│   ├── userdata.db              # SQLite (users, notifications, comments, media)
-│   ├── .env                     # JWT_SECRET=… (600, chown www-data if needed)
-│   └── logs/
-│       ├── api.log              # from api.php logMsg (via $CONFIG['log_dir'])
-│       ├── media.log
-│       ├── frontend.log / access.log / php.log  # via logging.php
-│       └── … .1 .2 .3 rotated (5 MB ×3)
-└── public_html/                 # docroot (what Apache serves)
+/home/davidfruin/domains/<site>/
+├── private/                     # OUTSIDE the docroot — not web-reachable
+│   ├── userdata.db              # SQLite
+│   ├── .env                     # JWT_SECRET=… (600)
+│   └── logs/                    # api.log, media.log, … rotated
+└── public_html/                 # docroot AND the git checkout root
     ├── .htaccess                # Authorization passthrough + <FilesMatch> denies
-    ├── .env.example             # documents JWT_SECRET
-    ├── config.php               # loads .env, exposes $CONFIG['jwt_secret','db_path','log_dir']
-    ├── api.php                  # ← main API (see §3)
-    ├── media.php               # upload/deleteMedia (multipart, mime → media table)
-    ├── logging.php             # writeLog/rotate, handle_log_request (auth-gated)
-    ├── clean-notifications.php  # CLI-only (SAPI gate + 403), deletes malformed notifs
-    ├── index.html              # SPA shell: <div id="header"> + <div id="main"> + <script> tags
+    ├── config.php               # loads .env; media limits, session TTLs, max_mentions
+    ├── api.php                  # main API dispatcher
+    ├── media.php                # upload / delete, multipart
+    ├── auth.php                 # JWT + session helpers, shared by api.php and media.php
+    ├── schema.php               # table definitions shared by every entry point
+    ├── webpush.php              # VAPID push sending
+    ├── logging.php              # writeLog / rotate
+    ├── clean-notifications.php  # CLI-only maintenance script
+    ├── app.html                 # the SPA shell
+    ├── index.html               # marketing landing page
+    ├── about|api|conduct|download|roadmap.html   # static pages
+    ├── manifest.json  sw.js     # PWA manifest and service worker
     ├── css/main.css
-    ├── site-icon.png
-    ├── js/
-    │   ├── main.js             # bootstrap, header render, notification polling
-    │   ├── store.js            # localStorage-backed JWT + user + notif count, pub/sub
-    │   ├── router.js           # hash router `#/page` / `#/page/:id`, auth guards
-    │   ├── api.js              # Api.call(action, params) → fetch to api.php/media.php
-    │   ├── logger.js           # frontend error forwarding → POST action=log
-    │   ├── components/
-    │   │   ├── post-card.js / comment.js / media-viewer.js
-    │   │   └── session-expired-modal.js
-    │   └── pages/
-    │       ├── login.js / register.js / reset-password.js
-    │       ├── feed.js / post.js / create-post.js (upload-on-select → post-with-url)
-    │       ├── profile.js / search.js / notifications.js / settings.js
-    └── tests/
-        ├── backend-tests/ (test_api.sh, test_api_auth.sh, test_media.sh, test_db.php …)
-        └── front-end-test/ (Playwright: playwright.config.js + tests/*.spec.js)
+    └── js/
+        ├── main.js store.js router.js api.js config.js logger.js
+        ├── header.js pwa.js install-button.js copy-button.js
+        ├── roadmap.js roadmap-data.js
+        ├── components/  post-card.js comment.js media-viewer.js
+        │                mention-picker.js session-expired-modal.js
+        └── pages/  login.js register.js reset-password.js feed.js post.js
+                    create-post.js profile.js search.js notifications.js settings.js
 ```
 
-Git-tracked vs. ignored: `.gitignore` has `*.log *.db .env media/ logs/ node_modules/` — the private data never enters git.
+**The repo root is the docroot.** Anything committed here is served. There is no
+in-repo path that is private without an `.htaccess` rule, which is why
+`notes.md` and this file are readable over HTTP (§8).
 
-### 2.2 CLI repo (`simple-social-cli`)
+Tests live in the separate `simple-social-tests` repo so browser dependencies
+never reach the docroot.
 
-```
-simple-social-cli/
-├── Makefile                     # vendor-links → vendor/libcurl.so, -Lvendor -lcurl, rpath, parallel-safe
-├── .gitignore                   # *.o *.so !vendor/libcurl.so
-├── vendor/
-│   ├── include/curl/ (275 headers, 8.14.1)
-│   └── libcurl.so → /usr/lib/x86_64-linux-gnu/libcurl.so.4.8.0
-├── lib/  (builds to lib/libss.so, -fPIC)
-│   ├── ss_api.c / .h            # 40 curl API functions, parse_* helpers, media upload_with_id
-│   ├── ss_json.c / .h           # hand-rolled parser: find_key, json_get_string/int/bool/array
-│   ├── ss_config.c / .h         # base_url from ~/.config/simple-social-cli/config.ini → data_dir/Downloads
-│   ├── ss_state.c / .h          # JWT + user persistence in ~/.simple-social-cli/{jwt.txt,user.json} with tui legacy fallback
-│   └── ss_utils.c / .h          # str_* , url_encode, truncate
-└── cli/
-    ├── main.c                   # auto_login, 28 commands, global --json/--color, bounded text joins
-    └── output.c / .h            # human tables vs bare JSON (json_escape, is_null_media), color via isatty
-```
+### 2.2 Terminal clients
 
-Build: `make -j4` → `vendor-links` → `lib/libss.so` → `simple-social-cli` (rpath `$ORIGIN/lib`). No `sudo`; `libcurl` resolved via vendored symlink because `.gitignore:2` previously hid it (fixed Phase B).
+Three repos, each installable on its own:
+
+| Repo | Binary | `make install` name |
+|------|--------|---------------------|
+| `simple-social-cli` | `simple-social-cli` | `sscli` |
+| `simple-social-tui` | `simple-social-tui` | `sstui` |
+| `simple-social-cli-interactive` | `simple-social-cli-interactive` | `sswiz` |
+
+`simple-social-cli` holds the shared library `lib/libss.a`; the other two vendor
+it as a git submodule at `vendor/simple-social-cli`, so
+`git clone --recursive && make` is the whole story for each.
+
+* **Static archive, not a shared object.** `libss.a` is linked directly, so each
+  binary is one self-contained file that works wherever it's copied or
+  symlinked. There is no `libss.so` and no `$ORIGIN` rpath — an earlier design
+  that needed the library to sit beside the binary.
+* **Header dependency tracking.** All three makefiles use `-MMD -MP`. Without
+  it, editing a struct in a header left stale objects linking against the old
+  layout — which builds cleanly and then misbehaves at runtime.
+* **Per-tool state.** `~/.simple-social-cli/<app>/`, so each tool signs in
+  separately. They do *not* share a session.
+* **Default server is production** (`ss_config.c`), overridable via
+  `~/.config/simple-social-cli/config.ini`.
 
 ---
 
-## 3. Backend (api.php — 950 lines)
+## 3. Backend
 
 ### 3.1 Request lifecycle
 
 ```
-HTTP POST  action=post&postText=hi  +  Authorization: Bearer <jwt>
+POST action=post&postText=hi   +   Authorization: Bearer <jwt>
         │
         ▼
-api.php top:  require config.php + logging.php
-              ob_start(), getRawPostData() merges php://input into $_POST
-              logMsg("REQUEST…")
+api.php: require config.php, logging.php, schema.php, auth.php
+         merge php://input into $_POST, logRequest() (masks password,
+         confirm, otp, reset_otp, refreshToken)
         │
         ▼
-db()  →  PDO('sqlite:'.$CONFIG['db_path']) + CREATE TABLE IF NOT EXISTS
-          • notifications (id, recipient_id, actor_id, actor_email, type, post_id, created_at)
-          • comments (id, post_id, user_id, comment_text, created_at)
-          • media (id, user_id, filename, type, path, created_at, post_id)  [added Phase M, migrated via PRAGMA]
-          • users / pending_users created lazily on register path
+db() → PDO sqlite + lazy schema:
+         users / pending_users            (register path)
+         comments, notifications, auth_attempts, push_subscriptions
+         ensureSharedSchema() → sessions, media  (shared with media.php)
         │
         ▼
-$HANDLERS = [ 'login' => 'handle_login', … 36 entries,
-              'getPostById' => handle_getPostById, 'getPostPreviews', 'log', … ]
-$PUBLIC_ENDPOINTS = ['login','sendRegisterOTP',…]  (no auth)
+requireAuth($pdo, $PUBLIC_ENDPOINTS)
+         public actions skip auth; otherwise bearerToken() → jwtVerify()
+         → sessionLookup(sid) → sessionTouch()
         │
         ▼
-requireAuth($pdo, $PUBLIC)  →  checks in_array, else parses Bearer, verifyUser()
-  verifyUser = jwtDecode (base64 payload, exp) + SELECT jwt FROM users WHERE id=? 
-               + string compare stored token (only HMAC check today is this equality)
-        │
-        ▼
-$HANDLERS[$action]($pdo,$user)  →  good()/bad()/respond()
-              respond() → ob_clean(), http_code, header application/json, json_encode(..., JSON_UNESCAPED_UNICODE)
-              logResponse / logError via logging.php
+$HANDLERS[$action]($pdo, $user) → good() / bad() / respond()
 ```
 
-### 3.2 Auth & user flow
+### 3.2 Auth
 
-* **Register:** `sendRegisterOTP` → mail OTP → `pending_users(email,otp,dateCreated)` (600 s) → `registerVerifyOTP` → `registerFinish` (password_hash, INSERT users, DELETE pending). Same shape for reset.
-* **Login:** `SELECT password FROM users WHERE LOWER(email)=LOWER(?)`, `password_verify`, `jwtEncode(sub, exp=6 months)` with `hash_hmac(sha256, header.payload, $CONFIG['jwt_secret'])`, `UPDATE users SET jwt='{"token":"…"}'`, return `jwt` + `userId`. Secret lives only in `private/.env`, loaded by `config.php:loadDotEnv`.
-* **Logout:** `jwtEncode` would fail closed (500) if secret missing; `logout` clears `users.jwt`.
-* **Session expired modal:** `js/components/session-expired-modal.js` catches 401 and prompts re-login.
+Sessions replaced the old single `users.jwt` slot, which could hold one token
+and therefore logged you out everywhere as soon as you logged in anywhere else.
+`users.jwt` still exists but is no longer read.
 
-### 3.3 Storage specifics
+* **`sessions` row:** `id` (the `sid` claim), `user_id`, `refresh_hash`
+  (SHA-256 — the raw refresh token is never stored), `created_at`,
+  `last_used_at`, `expires_at`, `revoked_at`, `device_name`, `user_agent`.
+* **Login** returns an access `jwt`, a `refreshToken` and `expiresIn`. Lifetimes
+  are `session_access_ttl` and `session_refresh_ttl` (sliding) in `config.php`.
+* **Cap:** `session_max_per_user`. Logging in past the cap evicts the least
+  recently used session.
+* **Refresh:** `refreshToken` is a public endpoint — the expired access token
+  can't authenticate the call that replaces it. `js/api.js` refreshes once on a
+  401, single-flight, then retries the original request before falling back to
+  the password modal.
+* **Revocation:** `logout` kills only its own session. `getSessions`,
+  `revokeSession` and `revokeAllOtherSessions` back the Devices list in
+  Settings. A password reset revokes everything.
 
-* **users row:** `id INTEGER PK, email UNIQUE, password (bcrypt), posts JSON text, follows JSON text, jwt JSON text, created_at, last_notifications_seen_at, reset_otp…`
-  * `posts` example entry: `{"id":"1.1789437926","text":"hello","timestamp":"2026-09-15 02:21:00","likes":[{"userId":4,"timestamp":"…"}],"mediaUrl":"/media/1/image/…webp"}`
-  * `follows` is `[{"id":4,"timestamp":"2026-03-03…"}, …]` — timestamp is embedded per-follow, hence `getMyFollows` joins against it.
-* **ID derivation:** `ownerId = (int)explode('.', $postId)[0]`. Every post read does `SELECT posts FROM users WHERE id = $ownerId` then linear scans the decoded array. No post table, no index.
-* **Likes are denormalized** inside each post object; toggling rewrites the whole `posts` JSON.
-* **media rows:** `(user_id, filename, type, path, post_id)` — `post_id` is NULL until `handle_post` links it; `deletePost` now resolves via this row rather than string concat (Phase M), preventing traversal.
+> **`jwtVerify()` does a real HMAC comparison** with `hash_equals`. The previous
+> implementation never verified the signature at all — it got away with it
+> because `verifyUser()` compared the whole token string against `users.jwt`, so
+> a forged token failed that match. Removing that string compare without adding
+> signature verification would have removed the only forgery protection.
 
-### 3.4 Handler inventory (36)
+`sessionTouch()` is throttled (5 minutes) so a read-only request doesn't take a
+SQLite write lock just to update `last_used_at`.
 
-Auth: `login, logout, getMyInfo, getUserInfo, getUsers, sendRegisterOTP, registerVerifyOTP, registerFinish, sendOTP, verifyOTP, resetPassword, deleteAccount`  
-Posts: `post, deletePost, getMyPosts, getUserPosts, fetchFollowedPosts, getPostById, getPostPreviews, likePost, unlikePost, getPostLikes, getPostCommentCounts, getPostComments`  
-Social: `followUser, unfollowUser, isFollowing, getMyFollows, getMyFollowers`  
-Notifications: `getNotifications, getUnseenNotificationCount, markNotificationsSeen`  
-Comments: `createComment, getPostComments, deleteComment`  
-System: `log, getUsers`  
+### 3.3 Storage
 
-`getPostById` now injects `userID/userEmail` from owner row (Phase A); `getPostPreviews` uses placeholders; `unlikePost` has `postFound`+`wasLiked` guard (Phase A); `getNotifications` is `LEFT JOIN users` for live `actor_email`.
+* **users row:** `id, email UNIQUE, password (bcrypt), posts JSON, follows JSON,
+  jwt (dead), created_at, last_notifications_seen_at, reset_otp, theme, hand`.
+* **Post read path:** `ownerId = explode('.', $postId)[0]` →
+  `SELECT posts FROM users WHERE id = ?` → linear scan of the decoded array.
+  There is no post table and no index; a post cannot be queried, only fetched
+  through its owner.
+* **Likes** are denormalised inside each post object, so toggling one rewrites
+  the owner's entire `posts` JSON.
+* **Mentions** are stored as `@[id]` tokens in the post text. `hydrateMentions()`
+  resolves them to `{id, email}` for clients; `resolveMentionTokens()` swaps
+  them for `@email` where plain readable text is needed, such as previews.
 
-### 3.5 Validation (Phase A)
-
-Shared `validateContent($text)` → `preg_match('/[^\x20-\x7E\n\r\xA0-\xFF]/u', $text)` — allows printable ASCII including `%`+`&`, newline `\n\r`, Latin1 `A0-FF` (covers `áéíóúñ¿¡«»` correctly with `/u`; the old byte loop rejected multi-byte). Both `post` and `createComment` call it; length cap 5000 remains.
-
-### 3.6 Media path (api.php + media.php)
+### 3.4 Handlers (45)
 
 ```
-Browser/CLI:  select file ──► POST /media.php action=uploadMedia (multipart)
-                               media.php: getMediaType(), max 10/100/50 MB, processImage → webp,
-                               INSERT media(user_id, path=/media/{uid}/{type}/…, post_id=NULL)
-                               ← {mediaUrl, mediaId, type}
-                               then POST /api.php action=post postText + mediaUrl
-                               api.php: SELECT id FROM media WHERE path=? AND user_id=? → 400 if not owned
-                                        INSERT post with mediaUrl, UPDATE media SET post_id = newPost.id
+Auth      login logout refreshToken getSessions revokeSession revokeAllOtherSessions
+          sendOTP verifyOTP resetPassword sendRegisterOTP verifyRegisterOTP finishRegister
+          deleteAccount getMyInfo getUserInfo getUsers getUserEmails
+Posts     post deletePost getMyPosts getUserPosts fetchFollowedPosts getPostById
+          getPostPreviews likePost unlikePost getPostLikes
+Comments  createComment getPostComments getPostCommentCounts deleteComment
+Social    followUser unfollowUser isFollowing getMyFollows getMyFollowers
+Notifs    getNotifications getUnseenNotificationCount markNotificationsSeen
+Push      getVapidPublicKey savePushSubscription deletePushSubscription
+Settings  updateTheme updateHand
+System    log
 ```
 
-Delete: `handle_deletePost` → `SELECT id,path FROM media WHERE path=? AND user_id=?` → `unlink(__DIR__.path)` + thumb + `DELETE FROM media`. `handle_deleteAccount` sweeps `media/user_id`.
+Public (no auth): `login, logout, refreshToken, sendOTP, verifyOTP,
+resetPassword, sendRegisterOTP, verifyRegisterOTP, finishRegister`.
 
-### 3.7 Observability
+### 3.5 Media
 
-* `api.php:logMsg` → `private/logs/api.log` (rotated) ; `logRequest` masks `password, confirm, otp, reset_otp`; `logResponse/logError` → `logging.php:writeLog`.
-* `logging.php:writeLog($level,$category,$msg,$ctx)` with `LOG_DIR=$CONFIG['log_dir']`, `LOG_MAX_SIZE 5 MB`, `LOG_ROTATE_COUNT 3`, `test_mode ? DEBUG : WARN` threshold. `handle_log_request` now requires auth (Phase A) and `clean-notifications.php` is CLI-only (403 over HTTP) + `<FilesMatch>` in `.htaccess` denies `*.db *.log .env`.
+`media.php` handles the upload; `api.php` links it to a post.
 
-### 3.8 Security deltas (Phase 0/A/M)
+```
+select file → POST /media.php action=uploadMedia (multipart)
+              type detection, limits from config.php (media_max_seconds,
+              media_max_fps, media_max_side, media_max_*_bytes),
+              images re-encoded to webp
+              INSERT media(user_id, path, post_id=NULL) → {mediaUrl, mediaId, type}
+            → POST /api.php action=post postText + mediaUrl
+              SELECT id FROM media WHERE path=? AND user_id=?   (400 if not owned)
+              UPDATE media SET post_id = <new post id>
+```
 
-* 0: leaked `userdata.db`/`api.log`/`clean-notifications.php`; fixed via `<FilesMatch>` + moving DB/logs to `private/` + JWT secret to `private/.env` + `UPDATE users SET jwt=''`.
-* A: OTP masking, validator UTF-8, JOIN for live email, deleteAccount comment cleanup, shadow rename, postFound guard.
-* M: media `post_id` linkage, ownership check, traversal guard, `..` rejection.
+Upload failures report a specific reason — which limit was exceeded, the
+detected MIME type, actual versus maximum size — rather than a generic failure.
+
+### 3.6 Observability
+
+`logRequest` / `logResponse` / `logError` write to `private/logs/` via
+`logging.php`, rotating at 5 MB × 3. **`logRequest` masks `password`, `confirm`,
+`otp`, `reset_otp` and `refreshToken`.** The refresh token matters most: it is a
+30-day credential for the whole account and outlives the access token.
 
 ---
 
-## 4. Frontend (SPA)
+## 4. Frontend
 
 ### 4.1 Boot
 
-`index.html` → `js/main.js:init()`:
-  `Store.init()` reads `localStorage[ss_jwt, ss_user]` → `api.setJwt` → `renderHeader()` → `Router.init()` (hashchange) → `startNotificationCheck()` poll `getUnseenNotificationCount` every N s → badge. `Store.subscribe` keeps header/badge in sync.
+`app.html` → `js/main.js:init()` → `Store.init()` reads
+`localStorage[ss_jwt, ss_user, ss_refresh]` → `api.setJwt` → `renderHeader()` →
+`Router.init()` → `startNotificationCheck()` polls `getUnseenNotificationCount`
+every 60s.
 
-### 4.2 Router & pages
+`header.js` is shared with the static pages, so a signed-in visitor sees the app
+navigation there too. It also draws the thumb-nav bubble on touchscreens and the
+back-to-top button.
 
-`router.js`:
-* `routes = {login, register, reset-password} requiresAuth:false` vs `feed, create-post, post, profile, notifications, settings, search` true.
-* `getRoute()` splits `#/feed` or `#/post/1.123` → `(page, id)`.
-* `handleHashChange()` enforces auth (→ `#/login` or `#/feed`), `container.innerHTML=''` + `currentPage.destroy()` then `switch(page)` → `LoginPage.render(container)` etc.
-* `navigate(path)` → `location.hash = path`.
+### 4.2 Router
 
-Each `js/pages/*.js` is an IIFE exposing `render(container), destroy()`:
-* `feed.js`: `api.fetchFollowedPosts(offset,limit)` → `post-card.js` renders + `media-viewer`.
-* `create-post.js`: file input → `api.uploadMedia(file)` preview (`currentMediaUrl`), submit → `api.post(text, currentMediaUrl)` (two-step, preview before post).
-* `post.js`: `api.getUserPosts(uid)` filter client-side (hence old `getPostById` was dead on web) + `getPostComments`.
-* `notifications.js`, `profile.js` (follows/followers tabs), `search.js`, `settings.js` similar.
-* `register.js` / `reset-password.js` do OTP steps.
+Hash routing: `#/feed`, `#/post/1.123`. `handleHashChange()` enforces auth, then
+`render()` calls the outgoing page's `destroy()`, clears `#main` and dispatches.
+
+* `pendingFresh` distinguishes a link click from back/forward, since
+  `hashchange` cannot. Fresh navigations scroll to the top; back/forward leaves
+  scrolling to the page so `feed.js` and `profile.js` can restore position.
+* `history.scrollRestoration` is `manual`, and a document load is treated as a
+  fresh navigation. Otherwise the browser re-applied the old offset after a
+  reload — which is what put Settings below the theme selector.
 
 ### 4.3 Data layer
 
-`js/api.js`:
-```
-class Api { jwt, call(action, params){
-  body = new URLSearchParams({action, ...params})
-  headers = {Authorization: 'Bearer '+this.jwt} if set
-  fetch('/api.php', {method:'POST', headers, body})
-  // media goes to fetch('/media.php', {method:'POST', body: FormData})
-  if (res.valid===false && res.error==='Unauthorized') throw SessionExpired
-  return res
-}}
-api.post(text, mediaUrl) → this.call('post',{postText:text, mediaUrl})
-api.likePost(id) → call('likePost',{postId:id}) etc.
-```
+`js/api.js` wraps `fetch`. On a 401 it calls `refreshSession()` once
+(single-flight, so concurrent calls share one refresh) and retries before
+showing the password modal. `mediaRequest()` gives uploads and deletes the same
+refresh-and-retry treatment.
 
-`js/store.js`: `state={jwt, user, notificationCount}`, `localStorage` for `ss_jwt/ss_user`, `subscribe(cb)` fires on `jwt/user/notificationCount`, `isLoggedIn()` checks `jwt!=null`.
+`js/store.js` holds `{jwt, user, notificationCount}` with `localStorage` keys
+`ss_jwt`, `ss_user`, `ss_refresh`, and a `subscribe(cb)` for header/badge sync.
 
-`js/logger.js`: `logFrontendError/info` → `POST action=log` (now auth-gated).
+### 4.4 PWA
 
-### 4.4 Components
+`manifest.json` plus `sw.js`:
 
-`post-card.js` renders post + like button + comment preview; `media-viewer.js` expands `/media/...webp`; `comment.js` nests under post; `session-expired-modal.js` overlays login.
-
-### 4.5 Flow examples
-
-**Feed:** `Router #/feed` → `feed.js:render` → `api.fetchFollowedPosts` → `api.php:fetchFollowedPosts` (collect followed IDs, SELECT users WHERE id IN (…), fan-out posts, attach userID/email, sort by timestamp, slice, `hasMore`) → `post-card` list.
-
-**Create post with media (web):** `create-post.js:handleMediaSelect` → `api.uploadMedia(File)` → `media.php` → preview → `handlePostSubmit` → `api.post(text, currentMediaUrl)` → `api.php` validates ownership + links `media.post_id`.
+* **Network-first for app code** — navigations and `.js`/`.css`. Cache-first
+  served stale JavaScript after a deploy, which produced three separate
+  "it doesn't work on my phone" incidents that were all the same root cause.
+* **Badging** mirrors the notifications page rather than the notification tray:
+  it clears on "mark as seen", not when a push is swiped away. The service
+  worker keeps its own cached count so it can re-assert the badge with no page
+  open.
+* **Web push** via `webpush.php` (VAPID). Subscriptions are tied to the session
+  that registered them, so revoking a device also stops its notifications.
 
 ---
 
-## 5. CLI (`simple-social-cli`)
+## 5. Cross-system flows
 
-### 5.1 Build & linkage
+**Post with media.** Web uploads on select, then posts; abandoning the page
+leaves an orphan until the media is cleared. The draft now keeps the media's
+path, type and id alongside the text, so leaving and returning restores it. The
+CLI uploads and posts in one go, rolling back the upload if the post fails.
 
-`Makefile`:
-* `vendor/include/curl 8.14.1` matches runtime `libcurl.so.4.8.0` via `vendor/libcurl.so -> /usr/lib/.../libcurl.so.4.8.0` (commit restores the symlink `.gitignore` hid).
-* `CFLAGS -fPIC -Ivendor/include -Ilib`; `LIB = lib/libss.so` (`-shared -Lvendor -lcurl`), `BIN = simple-social-cli` (`-Llib -lss -Wl,-rpath,'$ORIGIN/lib'`), `vendor-links` order + `BIN: $(CLI_OBJS) $(LIB)` fixes parallel race.
+**Like → notification.** `likePost` / `unlikePost` append to `likes[]` and
+insert a notification only when the actor isn't the owner. Mentions are the
+exception: a self-mention is allowed through so you can see your own tag.
 
-### 5.2 Library vs binary
-
-* **lib** (`-fPIC`, `.so`): `ss_api.c` 40 functions (api_call → libcurl POST + Bearer, `build_params/url_encode`), `ss_json.c` (find_key, skip_string, json_get_string/int/bool/array, array len/get), `ss_state.c` (jwt/user persistence in `~/.simple-social-cli/` with legacy tui fallback), `ss_config.c` (base_url + data_dir, `~/.config/simple-social-cli/config.ini`), `ss_utils.c` (trim, dup, url_encode).
-* **cli** (`main.c` + `output.c`): `auto_login()` tries `ss_state_load_jwt` → `api_get_my_info` validate → `api_set_user_id`; `commands[]` table; `g_color_enabled` (isatty fallback) vs `g_json_enabled` (disables color) as global flags parsed **before** command (design per user req).
-
-### 5.3 Command set (28)
-
-```
-AUTH: login <email> <pw>, logout, whoami, register <email> <otp> <pw> <cfm>, send-otp, reset-password
-POSTS: feed [--limit N --offset N], posts [user_id] [--limit --offset] (Phase C), post <id>, create <text> [--media <file>] (Phase M), delete <id>, like/unlike <id>, likes <id> (Phase C)
-COMMENTS: comments <postId> [--offset], comment <postId> <text>, delete-comment <id>
-USERS: users, profile [userId], follow/unfollow <userId>, followers/following [userId]
-NOTIFS: notifications [--offset], notify-count, mark-seen
-(no standalone upload — removed Phase M 2a)
-```
-
-### 5.4 Output modes
-
-`output.c`:
-* human: tables (`%-10s %-40s` for posts, color via `C_GREEN/C_CYAN` if `g_color_enabled`), truncated text (40 chars), `is_null_media("null")` guard.
-* json (bare): `json_escape` handles `" \ \n\r\t \u00xx`; `print_posts → {"posts":[{id,text,timestamp,userID,userEmail,likeCount,isLiked,mediaUrl,likes}],hasMore,totalCount}`, `print_post → {"post":{…}}`, `print_users → {"users":[{id,email,created_at}]}`, `print_comments`, `print_notifications`, `print_profile`, `print_count → {"count":N}`; errors → `{"ok":false,"error":"…"}` to stdout + stderr.
-
-### 5.5 State & data flow
-
-```
-$ simple-social-cli login me@… pw
-  → api_login → config_get_base_url (https://dev.davidfruin.com/api.php)
-  → curl POST action=login → {jwt, userId} → api_set_jwt/user_id
-  → ss_state_save_jwt/user (mkdir ~/.simple-social-cli, jwt.txt + user.json)
-
-$ simple-social-cli create "hi" --media ./pic.jpg
-  → auto_login (load + validate) → parse --media → api_upload_media_with_id (POST /media.php multipart, returns mediaUrl+mediaId)
-  → api_create_post(text, mediaUrl) → POST /api.php action=post (server validates ownership)
-  → on post failure api_delete_media(mediaId) rollback → print {"postId":…, "mediaUrl":…} or table
-```
-
-Text joining in `cmd_create/cmd_comment` is bounds-checked `5000` (Phase B) vs `api.php: 5000`.
+**Follow → feed.** `fetchFollowedPosts` collects followed IDs, pulls each
+owner's `posts` blob, merges, sorts by timestamp and slices. There is no
+follower table — `getMyFollowers` scans every user's `follows`.
 
 ---
 
-## 6. Cross-system flows
+## 6. Deployment
 
-### 6.1 Post with media (CLI vs web diverge then converge)
+1. Commit and push to GitHub.
+2. `ssh el1`, `git pull` in `dev.davidfruin.com/public_html`.
+3. Run the suite in `simple-social-tests` against dev.
+4. **Ask before pulling on `app.davidfruin.com`.** Production is never
+   automatic.
 
-Web: select file → `POST /media.php` → preview → submit → `POST /api.php` (two-step, abandon on close → orphan until reaper).  
-CLI: `create --media` → `POST /media.php` → immediate `POST /api.php` → rollback on post failure (no orphan window). Both hit the same `mediaUrl` ownership check.
+There is no build step: a pull is the deploy. Schema changes apply themselves on
+the next request through the lazy migrations in §1.
 
-### 6.2 Like / unlike → notification
-
-`likePost` / `unlikePost` in `api.php` each append `likes[]` and `INSERT notifications ... type='like'|'unlike'` only if `ownerId != actor` and (for unlike) `wasLiked` actually changed (Phase A). `getNotifications` now live-joins email. Frontend polls `getUnseenNotificationCount` vs `last_notifications_seen_at`.
-
-### 6.3 Follow → feed
-
-`users.follows` JSON tracks `{id,timestamp}` per target. `fetchFollowedPosts` collects all followed IDs, pulls their `posts` blobs, merges, sorts, slices. No follower table — `getMyFollowers` scans all `users.follows` for references to the target.
-
----
-
-## 7. Deployment & ops
-
-* `.htaccess`: `SetEnvIf Authorization` → `E=HTTP_AUTHORIZATION`, then `<FilesMatch "\.(db|log|env|sqlite)$"> Require all denied` etc. + `RewriteRule ^(userdata\.db|.*\.log|\.env.*|clean-…) [F,L]` — the private move is the real fix, this is defense-in-depth.
-* `config.php:loadDotEnv(__DIR__), loadDotEnv(dirname(__DIR__)), private/.env` precedence, then `$CONFIG['jwt_secret'] = getenv('JWT_SECRET')` (fail-closed 500 if null), plus `db_path`/`log_dir` resolution to `private/`.
-* On fresh host: `mkdir -p private/logs && php -r 'echo "JWT_SECRET=",bin2hex(random_bytes(32)),"\n";' > private/.env && chmod 600` then `UPDATE users SET jwt=''` to invalidate.
+On a fresh host: create `private/logs`, write `JWT_SECRET` into `private/.env`
+at mode 600.
 
 ---
 
-## 8. Notable gotchas
+## 7. Known problems
 
-* **Post ID collision** within same second → duplicate IDs overwriting. Mitigation would be `+ random` or `microtime`.
-* **Orphan media** pre-Phase M (your 2 test uploads) still at `/media/1/image/1_image_20260915013530_*` with `post_id=NULL` — left per your request, not backfilled.
-* **Old `~/.simple-social-tui`** data auto-falls back to `~/.simple-social-cli` (code in `ss_state.c`, `ss_config.c`, `main.c` logout).
-* **Tests are not on prod** per your repo branch plan; `tests/backend-tests` hits live `dev.davidfruin.com` with `TEST_EMAIL/TEST_PASSWORD`.
+These are real and verified, not hypothetical.
+
+* **Post ID collision.** Two posts created in the same second get the same ID,
+  and **deleting either one deletes both.** Reproduced on dev: both posts
+  returned id `1.1790146708`, `getPostById` returned only one, and deleting it
+  left no survivor. A double-tap on "Post" is enough. Fixing it means changing
+  post identity, which `comments.post_id`, `media.post_id` and the likes data
+  all reference as strings.
+* **`notes.md` and this file are served publicly.** The repo root is the
+  docroot, so `/notes.md` returns 200 on both sites.
+* **No reserved space for images.** `.post-media img` has no `aspect-ratio` or
+  `min-height`, so an image contributes zero height until it decodes and then
+  shoves the page down. Fixing it properly needs image dimensions stored on the
+  `media` row.
+* **Playback speed menu is clipped** on phones. Videos use native
+  `<video controls>`, so that menu belongs to the browser and is bounded by the
+  video box — roughly 263px tall on a 390px-wide phone, against the ~280px the
+  menu needs. Only custom controls can fix it.
+* **No foreign keys**, so deleting a user leaves comments and likes behind.
+* **Three timestamp formats** across tables (unix ints, `Y-m-d H:i:s`, ISO),
+  so cross-table comparisons need converting first.
+* **`mbstring` is not enabled** in the site's `php.ini` (`;extension=mbstring`).
+  The server CLI has it, so it looks available and isn't. Use `/u` regexes
+  rather than `mb_*` in anything that runs under the web SAPI.
 
 ---
 
-*Generated for `simple-social` repo. See `simple-social-cli` repo for its `ARCHITECTURE.md` (CLI-centric view).*
+*See each terminal client's own repo for its build details.*
