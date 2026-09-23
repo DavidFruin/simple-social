@@ -86,9 +86,8 @@ function db() {
     $pdo->exec('CREATE TABLE IF NOT EXISTS auth_attempts (
         attempt_key TEXT PRIMARY KEY, failures INTEGER NOT NULL,
         window_start INTEGER NOT NULL, locked_until INTEGER NOT NULL DEFAULT 0)');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS media (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
-        filename TEXT NOT NULL, type TEXT NOT NULL, path TEXT NOT NULL, created_at TEXT NOT NULL, post_id TEXT)');
+    // `media` and its post_id migration live in schema.php - media.php needs
+    // the same table, and keeping one copy is the whole point of that file.
     // One row per browser/device a user has enabled push on. endpoint is
     // unique so re-subscribing the same browser replaces its row instead of
     // piling up duplicates.
@@ -97,12 +96,6 @@ function db() {
         endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL,
         created_at TEXT NOT NULL)');
     $pdo->exec('CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)');
-    try {
-        $cols = $pdo->query("PRAGMA table_info(media)")->fetchAll(PDO::FETCH_ASSOC);
-        $hasPostId = false;
-        foreach ($cols as $c) if ($c['name'] === 'post_id') $hasPostId = true;
-        if (!$hasPostId) $pdo->exec('ALTER TABLE media ADD COLUMN post_id TEXT');
-    } catch (Exception $e) {}
     try {
         $cols = $pdo->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC);
         $hasTheme = false;

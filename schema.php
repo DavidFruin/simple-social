@@ -10,6 +10,34 @@
 // Everything here is idempotent: safe to call on every request.
 
 function ensureSharedSchema($pdo) {
+    // Uploaded files. Both entry points need this: media.php writes the rows,
+    // api.php reads them when a post is created or an account is deleted. It
+    // used to be declared separately in each, which is what this file exists
+    // to stop.
+    $pdo->exec('CREATE TABLE IF NOT EXISTS media (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        filename TEXT NOT NULL,
+        type TEXT NOT NULL,
+        path TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        post_id TEXT)');
+
+    // Every read of this table filters on user_id -- on its own, together
+    // with path, and when clearing out a deleted account. The index existed
+    // on both live databases but in no source file, so it had been created by
+    // hand at some point and a fresh install would have quietly gone without
+    // it and scanned the table instead.
+    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_media_user_id ON media(user_id)');
+
+    // Databases created before post_id existed.
+    try {
+        $cols = $pdo->query("PRAGMA table_info(media)")->fetchAll(PDO::FETCH_ASSOC);
+        $hasPostId = false;
+        foreach ($cols as $c) if ($c['name'] === 'post_id') $hasPostId = true;
+        if (!$hasPostId) $pdo->exec('ALTER TABLE media ADD COLUMN post_id TEXT');
+    } catch (Exception $e) {}
+
     // One row per login. Replaces the single `users.jwt` slot, which could
     // only ever hold one token and so logged a user out everywhere as soon
     // as they logged in anywhere else. `users.jwt` is deliberately left in
