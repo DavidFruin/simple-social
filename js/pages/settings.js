@@ -48,6 +48,7 @@ const SettingsPage = {
             <li><a href="/about.html">About</a></li>
             <li><a href="/api.html">API</a></li>
             <li><a href="/conduct.html">Code of Conduct</a></li>
+            <li><a href="/roadmap.html">Roadmap</a></li>
             <li><a href="/download.html">Download</a></li>
           </ul>
         </div>

@@ -2086,6 +2086,95 @@ html.media-viewer-open body {
   columns: 2;
 }
 
+/* Roadmap page (roadmap.html) */
+.roadmap-summary {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.roadmap-list {
+  list-style: none;
+  /* Overrides .static-card ul's indent: these rows carry their own tick
+     column, so a bullet indent on top of it just pushes them off-centre. */
+  padding-left: 0;
+}
+
+.roadmap-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.roadmap-item:last-child {
+  border-bottom: none;
+}
+
+/* Fixed width so the titles line up whether or not a row has a tick. */
+.roadmap-mark {
+  flex: 0 0 1.25rem;
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.roadmap-item:not(.roadmap-item-done) .roadmap-mark::before {
+  content: '';
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+}
+
+/* flex-basis 0 with min-width 0, not basis auto: auto sizes the column to its
+   longest line first, so a long title outgrew the row and wrapped the whole
+   block onto the next line, stranding the tick on a line of its own. */
+.roadmap-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.roadmap-title {
+  font-weight: 600;
+}
+
+.roadmap-item-done .roadmap-title {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.roadmap-detail {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.roadmap-when {
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* On a phone the date can't sit beside the text without squeezing it to a
+   couple of words per line, so it drops under the title instead. */
+@media (max-width: 600px) {
+  .roadmap-item {
+    flex-wrap: wrap;
+  }
+
+  /* Lines the date up under the title rather than under the tick: the tick
+     column plus the row's gap is exactly where the text starts. */
+  .roadmap-when {
+    flex-basis: 100%;
+    padding-left: calc(1.25rem + var(--spacing-md));
+  }
+}
+
 @media (max-width: 768px) {
   .static-card {
     padding: var(--spacing-lg);

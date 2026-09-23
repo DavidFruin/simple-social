@@ -34,6 +34,7 @@ function renderHeader() {
           <a href="/about.html">About</a>
           <a href="/api.html">API</a>
           <a href="/conduct.html">Code of Conduct</a>
+          <a href="/roadmap.html">Roadmap</a>
           <a href="/download.html">Download</a>
           <a href="/app.html#/register">Register</a>
           <a href="/app.html#/login">Login</a>
