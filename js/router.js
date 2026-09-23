@@ -34,6 +34,17 @@ const Router = {
       }
     }, true);
     window.addEventListener('hashchange', () => this.handleHashChange());
+
+    // Take scroll position off the browser. Left on "auto" it re-applies the
+    // previous offset after a reload, and since a reload is a fresh document
+    // load rather than a hashchange, nothing here was undoing it -- refreshing
+    // while scrolled down on Settings put you below the theme selector.
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+    // A document load starts at the top. It isn't a back/forward, and the
+    // feed's and profile's own restore paths can't run on one anyway: both
+    // require state (this.posts / this.user) that a fresh load doesn't have.
+    this.pendingFresh = true;
     this.handleHashChange();
   },
 
