@@ -858,6 +858,12 @@ const CreatePostPage = {
 
       textarea.value = '';
       this.clearDraft();
+      // The feed and profile hold their own cached copy of the post list and
+      // redraw from it on back/forward, so going back after posting showed a
+      // list without the new post until you reloaded by hand. Dropping the
+      // caches makes the next visit refetch.
+      if (typeof FeedPage !== 'undefined') FeedPage.clearCache();
+      if (typeof ProfilePage !== 'undefined') ProfilePage.clearCache();
       // Media is now owned by the post - reset state without deleting it
       this.resetMediaState();
       showSuccess('Post created!');
