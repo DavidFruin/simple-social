@@ -2227,6 +2227,20 @@ html.media-viewer-open body {
   animation: toast-flash 0.5s;
 }
 
+/* On a touchscreen the toast sat 28px off the bottom, level with the thumb
+   bubble and the back-to-top button (both bottom: 24px, ~56px tall). It
+   doesn't actually collide with them -- long messages wrap rather than widen,
+   so it stays within the middle third -- but sitting in that band of corner
+   furniture, right where a hand rests, is what made messages easy to miss.
+   96px clears the whole band, plus the home indicator where there is one.
+   Same query as #thumb-nav, so a narrow desktop window -- which has no bubble
+   -- keeps the original position. */
+@media (hover: none) and (pointer: coarse) {
+  .toast {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @keyframes toast-flash {
   0%, 50%, 100% { opacity: 1; }
   25%, 75% { opacity: 0.3; }
