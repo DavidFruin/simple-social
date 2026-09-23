@@ -46,7 +46,7 @@ const CreatePostPage = {
                  feature would otherwise anchor it to the page instead and
                  render it a full viewport below the fold. -->
             <div class="mention-wrap" style="position: relative;">
-              <textarea id="post-text" maxlength="5000" placeholder="What's on your mind?">${escapeHtml(draft)}</textarea>
+              <textarea id="post-text" maxlength="5000" placeholder="What's on your mind?">${escapeHtml(draft.text)}</textarea>
               <div id="post-text-mentions" class="search-dropdown hidden"></div>
             </div>
             <p class="composer-note">Every post needs some text &mdash; media on its own isn't enough. Type @ to tag someone.</p>
@@ -104,7 +104,7 @@ const CreatePostPage = {
             </div>
             
             <div class="composer-actions">
-              <span id="char-count">${draft.length}/5000</span>
+              <span id="char-count">${draft.text.length}/5000</span>
               <button type="submit" class="btn btn-primary">Post</button>
             </div>
           </form>
@@ -113,6 +113,29 @@ const CreatePostPage = {
     `;
 
     this.attachEventListeners();
+    this.restoreDraftMedia(draft);
+  },
+
+  // Puts a draft's media back on screen. Without this the page kept the
+  // uploaded file's details in memory but drew no preview, so after leaving
+  // and coming back the composer looked empty while still holding media --
+  // and posting silently attached a file the writer couldn't see. After a
+  // full reload the details were gone entirely and the upload was orphaned.
+  restoreDraftMedia(draft) {
+    if (!draft.mediaUrl || !draft.mediaType) return;
+
+    this.currentMediaUrl = draft.mediaUrl;
+    this.currentMediaType = draft.mediaType;
+    this.currentMediaId = draft.mediaId;
+    // originalImage is deliberately not restored: it only exists to re-rotate
+    // from the untouched file, which isn't worth persisting. Rotation stays
+    // available until you leave the page, and the media itself is unaffected.
+    this.renderMediaPreview({ mediaUrl: draft.mediaUrl, type: draft.mediaType });
+
+    const status = document.getElementById('media-status');
+    const selectMediaBtn = document.getElementById('select-media-btn');
+    if (status) status.textContent = 'Saved from your last draft';
+    if (selectMediaBtn) selectMediaBtn.textContent = 'Replace Media';
   },
 
   attachEventListeners() {
@@ -214,6 +237,9 @@ const CreatePostPage = {
       this.currentMediaType = result.type;
       this.currentMediaId = result.mediaId;
       this.renderMediaPreview(result);
+      // So the attachment survives leaving the page or reloading, the same
+      // way the text already did.
+      this.syncDraft();
       return result;
     } finally {
       this.uploading = false;
@@ -767,7 +793,10 @@ const CreatePostPage = {
     this.imageRotation = 0;
     this.stopCaptureStream();
     this.stopVisualizer();
-    
+    // Drop the media from the saved draft too, or removing it here would
+    // bring it straight back on the next visit.
+    this.syncDraft();
+
     const preview = document.getElementById('media-preview');
     const mediaInput = document.getElementById('media-input');
     const status = document.getElementById('media-status');
@@ -840,16 +869,64 @@ const CreatePostPage = {
     }
   },
 
-  saveDraft(text) {
-    localStorage.setItem(this.DRAFT_KEY, text);
+  // Re-saves the draft using whatever is in the textarea right now. For the
+  // places where the media changed but the text didn't.
+  syncDraft() {
+    this.saveDraft(document.getElementById('post-text')?.value ?? '');
   },
 
+  // The draft holds the attached media as well as the text. Only the server
+  // path, type and id are stored -- the file itself is already uploaded by the
+  // time there's anything to save, so this is three short strings, not blob
+  // data, and it stays well clear of the localStorage quota.
+  saveDraft(text) {
+    const draft = {
+      text: text ?? '',
+      mediaUrl: this.currentMediaUrl,
+      mediaType: this.currentMediaType,
+      mediaId: this.currentMediaId
+    };
+    try {
+      localStorage.setItem(this.DRAFT_KEY, JSON.stringify(draft));
+    } catch (err) {
+      // A full or blocked localStorage shouldn't take the composer down.
+      console.error('Could not save draft:', err.message);
+    }
+  },
+
+  // Always returns the object shape. Drafts written before media was saved
+  // are a bare text string, so those are read as text with no media rather
+  // than being thrown away.
   loadDraft() {
-    return localStorage.getItem(this.DRAFT_KEY) || '';
+    const empty = { text: '', mediaUrl: null, mediaType: null, mediaId: null };
+    let raw;
+    try {
+      raw = localStorage.getItem(this.DRAFT_KEY);
+    } catch (err) {
+      return empty;
+    }
+    if (!raw) return empty;
+    if (raw[0] !== '{') return { ...empty, text: raw };
+
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        text: typeof parsed.text === 'string' ? parsed.text : '',
+        mediaUrl: parsed.mediaUrl || null,
+        mediaType: parsed.mediaType || null,
+        mediaId: parsed.mediaId || null
+      };
+    } catch (err) {
+      return empty;
+    }
   },
 
   clearDraft() {
-    localStorage.removeItem(this.DRAFT_KEY);
+    try {
+      localStorage.removeItem(this.DRAFT_KEY);
+    } catch (err) {
+      console.error('Could not clear draft:', err.message);
+    }
   }
 };
 
