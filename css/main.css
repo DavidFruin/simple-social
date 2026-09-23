@@ -859,6 +859,36 @@ footer {
   margin-top: var(--spacing-sm);
 }
 
+/* On a phone everything in the composer bunched into the upper half -- the
+   Post button landed around 60% down with a dead third of the screen below
+   it, so the one control you always press was the furthest from your thumb.
+   Giving the form a minimum height and letting the actions take the leftover
+   space drops them into reach. min-height, not a fixed margin: once media or
+   a long draft makes the form taller than this, the actions just follow the
+   content instead of being pushed off-screen. */
+/* min-height: 700px because a shorter phone has no dead space to reclaim --
+   the composer already fills it. Measured on a 360x640: the content ends at
+   531 on its own, and pushing it any further put the Post button underneath
+   the thumb bubble, which is worse than where it started. */
+@media (hover: none) and (pointer: coarse) and (min-height: 700px) {
+  #post-form {
+    display: flex;
+    flex-direction: column;
+    /* Reserve a fixed band at the bottom rather than using a percentage, so
+       the clearance is the same on every phone. The bottom ~200px is spoken
+       for: the thumb bubble and back-to-top button sit in the last 80px and
+       the toast now tops out around 96-170px up. A vh percentage kept that
+       clearance only on tall screens -- at 62vh a 640px phone left just 64px
+       and put the Post button right under the bubble. */
+    min-height: calc(100vh - 320px);
+  }
+
+  #post-form .composer-actions {
+    margin-top: auto;
+    padding-top: var(--spacing-md);
+  }
+}
+
 #char-count {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
