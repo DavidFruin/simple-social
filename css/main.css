@@ -1066,6 +1066,16 @@ footer {
   font-style: italic;
 }
 
+/* Underlined as well as coloured, so a link is still obvious in the themes
+   where --color-primary sits close to the body text. overflow-wrap because a
+   long URL is one unbroken word and would otherwise push the card wider than
+   the screen on a phone. */
+.post-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
 .users-list {
   display: flex;
   flex-direction: column;

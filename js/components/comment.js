@@ -18,7 +18,7 @@ function createCommentElement(comment, options = {}) {
       <span class="comment-time">${formatTimestamp(comment.created_at)}</span>
       ${isOwner && showDeleteButton ? '<button class="btn-delete-comment" data-comment-id="' + comment.id + '">Delete</button>' : ''}
     </div>
-    <div class="comment-body">${linkifyMentions(escapeHtml(comment.text), comment.mentions)}</div>
+    <div class="comment-body">${renderPostText(comment.text, comment.mentions)}</div>
   `;
 
   return div;

@@ -39,7 +39,7 @@ function createPostCard(post, options = {}) {
         <span class="post-time">${formatTimestamp(post.timestamp)}</span>
         ${isOwner ? `<button class="btn-delete-post" data-post-id="${post.id}">Delete</button>` : ''}
       </div>
-      <div class="post-body">${linkifyMentions(escapeHtml(post.text), post.mentions)}</div>
+      <div class="post-body">${renderPostText(post.text, post.mentions)}</div>
       <button type="button" class="btn btn-secondary post-show-more hidden">Show more</button>
       ${mediaHtml}
       <div class="post-footer">
@@ -112,6 +112,79 @@ function escapeHtml(unsafe) {
 // changes later. `mentions` is the [{id, email}] array the API attaches to
 // the post/comment; a null email (the user was deleted) renders as plain,
 // unlinked text instead.
+// The one way a post or comment body becomes display HTML: escape, then link
+// mentions, then link URLs. Kept as a single function so the two render sites
+// (post-card and comment) can't drift apart in how they treat the same text.
+// URLs are linked before mentions, and mentions are then kept out of any
+// anchor that pass produced. Doing it the other way round split a URL that
+// happened to contain an "@[26]" into three pieces: the mention replacement
+// fired inside what was about to become the href.
+function renderPostText(text, mentions) {
+  const withUrls = linkifyUrls(escapeHtml(text));
+  return outsideAnchors(withUrls, (segment) => linkifyMentions(segment, mentions));
+}
+
+// The input is fully escaped, so there are no tags in it yet and a plain
+// replace is safe -- `<` only exists as `&lt;`.
+function linkifyUrls(escapedText) {
+  return escapedText.replace(/\bhttps?:\/\/[^\s<]+/g, (url) => {
+    const { href, trail } = splitTrailingPunctuation(url);
+    if (!href) return url;
+    // target=_blank keeps the app (and any unsent draft) open; noopener is
+    // what stops the opened page reaching back through window.opener.
+    return `<a href="${href}" class="post-link" target="_blank" rel="noopener noreferrer">${href}</a>${trail}`;
+  });
+}
+
+// Applies fn to the parts of the HTML that aren't inside an <a> element, so a
+// later pass can't rewrite a link's href or its visible text.
+function outsideAnchors(html, fn) {
+  return html
+    .split(/(<a\b[^>]*>[\s\S]*?<\/a>)/g)
+    .map(part => (part.startsWith('<a') ? part : fn(part)))
+    .join('');
+}
+
+// "look at https://example.com." shouldn't put the full stop inside the link.
+// A closing bracket only belongs to the URL if the URL opened one.
+//
+// A bare ';' is never stripped: the text is already escaped, so `&amp;` and
+// `&#39;` end in a semicolon, and cutting it would leave a broken entity.
+// Whole trailing entities come off instead, which is what a quote mark
+// written after a URL looks like by the time it reaches here.
+function splitTrailingPunctuation(url) {
+  let href = url;
+  let trail = '';
+
+  for (;;) {
+    const entity = href.match(/(&[a-zA-Z]+;|&#\d+;)$/);
+    if (entity) {
+      trail = entity[0] + trail;
+      href = href.slice(0, -entity[0].length);
+      continue;
+    }
+
+    const last = href[href.length - 1];
+    if (last === undefined) break;
+
+    if ('.,!?:'.includes(last) || last === ']' || last === '}') {
+      trail = last + trail;
+      href = href.slice(0, -1);
+      continue;
+    }
+
+    if (last === ')' && (href.split(')').length > href.split('(').length)) {
+      trail = last + trail;
+      href = href.slice(0, -1);
+      continue;
+    }
+
+    break;
+  }
+
+  return { href, trail };
+}
+
 function linkifyMentions(escapedText, mentions) {
   if (!mentions || !mentions.length) return escapedText;
   const byId = {};
