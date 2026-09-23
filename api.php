@@ -303,6 +303,55 @@ function notifyMentions($pdo, $mentionIds, $actorId, $actorEmail, $postId) {
     }
 }
 
+const PREVIEW_MAX_CHARS = 25;
+
+// Swaps @[id] tokens for @email across a batch of texts, in one query for the
+// whole batch rather than one per text. Used where a mention has to survive as
+// plain readable text (post previews) instead of being linkified client-side.
+// An id with no user left behind reads as "@someone".
+function resolveMentionTokens($pdo, $texts) {
+    $ids = [];
+    foreach ($texts as $text) {
+        preg_match_all('/@\[(\d+)\]/', $text, $matches);
+        foreach ($matches[1] as $id) $ids[(int)$id] = true;
+    }
+    if (!$ids) return $texts;
+
+    $ids = array_keys($ids);
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id IN ($placeholders)");
+    $stmt->execute($ids);
+    $emails = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $emails[(int)$row['id']] = $row['email'];
+    }
+
+    foreach ($texts as $key => $text) {
+        $texts[$key] = preg_replace_callback('/@\[(\d+)\]/', function ($m) use ($emails) {
+            return '@' . ($emails[(int)$m[1]] ?? 'someone');
+        }, $text);
+    }
+    return $texts;
+}
+
+// Cuts on a character boundary, not a byte boundary: posts may contain the
+// Latin-1 accented letters, which are two bytes in UTF-8, and a byte-wise
+// substr() can split one in half and produce invalid UTF-8 that json_encode
+// then refuses to encode.
+//
+// Done with a /u regex rather than mb_substr on purpose -- this site's
+// php.ini has ";extension=mbstring", so mbstring can't be relied on in the
+// web SAPI, whereas PCRE's UTF-8 support is always compiled in.
+//
+// Only appends the ellipsis when something was actually removed; the old
+// version put "..." after every preview, including complete short ones.
+function truncatePreview($text) {
+    $text = trim($text);
+    if (!preg_match('/^.{0,' . PREVIEW_MAX_CHARS . '}/us', $text, $m)) return $text;
+    if ($m[0] === $text) return $text;
+    return rtrim($m[0]) . '...';
+}
+
 // Resolves @[id] tokens to {id, email} for the API response, so clients
 // don't need a separate round trip. A deleted user's id still resolves --
 // email comes back null and the caller renders a fallback.
@@ -790,7 +839,6 @@ function handle_getPostPreviews($pdo, $user) {
         return;
     }
 
-    $previews = [];
     $ownerIds = [];
     foreach ($postIds as $pid) {
         $ownerId = (int)explode('.', $pid)[0];
@@ -807,13 +855,24 @@ function handle_getPostPreviews($pdo, $user) {
     $stmt->execute($ids);
     $rows = $stmt->fetchAll();
 
+    $texts = [];
     foreach ($rows as $row) {
         $posts = json_decode($row['posts'], true) ?? [];
         foreach ($posts as $post) {
             if (in_array($post['id'], $postIds) && !empty($post['text'])) {
-                $previews[$post['id']] = substr($post['text'], 0, 25) . '...';
+                $texts[$post['id']] = $post['text'];
             }
         }
+    }
+
+    // Resolve the @[id] tokens before cutting, not after. Cutting first can
+    // slice a token in half and leave "@[1" sitting in the preview, and even
+    // an intact token means nothing to whoever reads it.
+    $texts = resolveMentionTokens($pdo, $texts);
+
+    $previews = [];
+    foreach ($texts as $id => $text) {
+        $previews[$id] = truncatePreview($text);
     }
 
     respond(good(['previews' => $previews]));
