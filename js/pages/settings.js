@@ -25,6 +25,9 @@ const SettingsPage = {
               <label for="hand-toggle" class="hand-toggle-switch"><span></span></label>
               <span class="hand-toggle-word hand-right">Right</span>
             </div>
+            <!-- Deliberately not "phones only": the menu bubble is, but the
+                 back-to-top button swaps corners on a computer too. -->
+            <p class="settings-note">Puts the menu bubble in the corner you can reach with your thumb. The bubble only appears on phones and tablets &mdash; on a computer this just moves the &ldquo;back to top&rdquo; button to the other corner.</p>
           </div>
         </div>
 
