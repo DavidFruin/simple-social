@@ -38,6 +38,10 @@ function logRequest($action, $params = [], $isPublic = false) {
     if (isset($safeParams['confirm'])) $safeParams['confirm'] = '***';
     if (isset($safeParams['otp'])) $safeParams['otp'] = '***';
     if (isset($safeParams['reset_otp'])) $safeParams['reset_otp'] = '***';
+    // A refresh token is a 30-day credential for the whole account, so it
+    // must never reach the log - more sensitive than the access token, not
+    // less, because it long outlives it.
+    if (isset($safeParams['refreshToken'])) $safeParams['refreshToken'] = '***';
     if (isset($safeParams['postText'])) $safeParams['postText'] = substr($safeParams['postText'], 0, 50) . (strlen($safeParams['postText']) > 50 ? '...' : '');
     if (isset($safeParams['text'])) $safeParams['text'] = substr($safeParams['text'], 0, 50) . (strlen($safeParams['text']) > 50 ? '...' : '');
     $paramsStr = json_encode($safeParams);
