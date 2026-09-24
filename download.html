@@ -40,8 +40,8 @@
 
                     <p>1. Install the build tools:</p>
                     <div class="code-block">
-                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libcurl4 pkg-config</code></pre>
-                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libcurl4 pkg-config">Copy</button>
+                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential git libcurl4 pkg-config</code></pre>
+                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential git libcurl4 pkg-config">Copy</button>
                     </div>
 
                     <p>2. Clone the repo, somewhere you own &mdash; your home directory is fine:</p>
@@ -65,8 +65,8 @@
 
                     <p>1. Install the build tools:</p>
                     <div class="code-block">
-                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libcurl4 pkg-config</code></pre>
-                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libcurl4 pkg-config">Copy</button>
+                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential git libcurl4 pkg-config</code></pre>
+                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential git libcurl4 pkg-config">Copy</button>
                     </div>
 
                     <p>2. Clone the repo, somewhere you own &mdash; your home directory is fine. <code>--recursive</code> also fetches the small library it's built on:</p>
@@ -96,12 +96,12 @@
 
                         <p>1. Install the build tools and ncurses:</p>
                         <div class="os-panel code-block" data-os="lmde">
-                            <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libncurses-dev libcurl4 pkg-config</code></pre>
-                            <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libncurses-dev libcurl4 pkg-config">Copy</button>
+                            <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential git libncurses-dev libcurl4 pkg-config</code></pre>
+                            <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential git libncurses-dev libcurl4 pkg-config">Copy</button>
                         </div>
                         <div class="os-panel code-block" data-os="omarchy" hidden>
-                            <pre><code>sudo pacman -S --needed base-devel ncurses curl pkgconf</code></pre>
-                            <button class="copy-btn" data-copy="sudo pacman -S --needed base-devel ncurses curl pkgconf">Copy</button>
+                            <pre><code>sudo pacman -S --needed base-devel git ncurses curl pkgconf</code></pre>
+                            <button class="copy-btn" data-copy="sudo pacman -S --needed base-devel git ncurses curl pkgconf">Copy</button>
                         </div>
 
                         <p class="os-panel" data-os="lmde">If <code>apt update</code> fails because of a broken third-party repository (for example a missing signing key), run the install on its own instead of chained after it &mdash; the failed update stops the whole line from ever reaching the install.</p>
