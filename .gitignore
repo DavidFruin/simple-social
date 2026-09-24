@@ -1,6 +1,7 @@
 *.log
 *.db
 node_modules/
+vendor/
 tmp/
 .env
 media/
