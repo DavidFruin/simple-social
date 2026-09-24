@@ -8,3 +8,6 @@ tests/front-end-test/test-results/
 logs/
 CLAUDE.md
 docs/
+.DS_Store
+*.swp
+*~
