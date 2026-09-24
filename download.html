@@ -86,15 +86,27 @@
                     <p>This builds it and copies it to <code>/usr/local/bin/sswiz</code>, so you can run it as <code>sswiz</code> from anywhere (<code>sudo make uninstall</code> to remove it). If you'd rather not install it system-wide, run <code>cd simple-social-cli-interactive &amp;&amp; make</code> instead, then use it as <code>./simple-social-cli-interactive</code> from inside that folder.</p>
 
                     <h2>TUI</h2>
-                    <p>A full-screen terminal interface you navigate with the keyboard. It's a standalone download &mdash; you don't need the CLI above unless you want it too. Debian and Ubuntu only for now, same as the CLI.</p>
+                    <p>A full-screen terminal interface you navigate with the keyboard. It's a standalone download &mdash; you don't need the CLI above unless you want it too. Tested on Debian-based systems (LMDE 7) and Arch-based systems (Omarchy Quattro) &mdash; pick the one you're on below.</p>
 
-                    <p>1. Install the build tools and ncurses:</p>
-                    <div class="code-block">
-                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libncurses-dev libcurl4 pkg-config</code></pre>
-                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libncurses-dev libcurl4 pkg-config">Copy</button>
+                    <div class="os-instructions">
+                        <div class="os-tabs">
+                            <button type="button" class="os-tab btn btn-primary" data-os="lmde">LMDE 7</button>
+                            <button type="button" class="os-tab btn btn-ghost" data-os="omarchy">Omarchy Quattro</button>
+                        </div>
+
+                        <p>1. Install the build tools and ncurses:</p>
+                        <div class="os-panel code-block" data-os="lmde">
+                            <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libncurses-dev libcurl4 pkg-config</code></pre>
+                            <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libncurses-dev libcurl4 pkg-config">Copy</button>
+                        </div>
+                        <div class="os-panel code-block" data-os="omarchy" hidden>
+                            <pre><code>sudo pacman -S --needed base-devel ncurses curl pkgconf</code></pre>
+                            <button class="copy-btn" data-copy="sudo pacman -S --needed base-devel ncurses curl pkgconf">Copy</button>
+                        </div>
+
+                        <p class="os-panel" data-os="lmde">If <code>apt update</code> fails because of a broken third-party repository (for example a missing signing key), run the install on its own instead of chained after it &mdash; the failed update stops the whole line from ever reaching the install.</p>
+                        <p class="os-panel" data-os="omarchy" hidden>Omarchy already ships these as part of the base system, so this step is usually a no-op &mdash; it's here in case you're on a minimal install. <code>--needed</code> skips anything already installed instead of reinstalling it.</p>
                     </div>
-
-                    <p>If <code>apt update</code> fails because of a broken third-party repository (for example a missing signing key), run the install on its own instead of chained after it &mdash; the failed update stops the whole line from ever reaching the install.</p>
 
                     <p>2. Clone the repo, somewhere you own &mdash; your home directory is fine. <code>--recursive</code> also fetches the small library it's built on:</p>
                     <div class="code-block">
@@ -120,6 +132,7 @@
     </div>
     <script src="/js/install-button.js"></script>
     <script src="/js/copy-button.js"></script>
+    <script src="/js/os-toggle.js"></script>
     <script src="/js/store.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/header.js"></script>

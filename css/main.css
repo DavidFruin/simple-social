@@ -2331,3 +2331,10 @@ html.media-viewer-open body {
   border-color: var(--color-success);
   color: var(--color-success);
 }
+
+/* ============== OS TOGGLE (download page) ============== */
+.os-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
