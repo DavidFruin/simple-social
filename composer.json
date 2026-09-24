@@ -9,6 +9,9 @@
     "autoload": {
         "psr-4": {
             "App\\": "src/"
-        }
+        },
+        "files": [
+            "src/Auth/handlers.php"
+        ]
     }
 }
