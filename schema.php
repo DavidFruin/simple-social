@@ -69,4 +69,32 @@ function ensureSharedSchema($pdo) {
             if (!$hasSessionId) $pdo->exec('ALTER TABLE push_subscriptions ADD COLUMN session_id TEXT');
         }
     } catch (Exception $e) {}
+
+    // Real posts table, alongside the legacy users.posts JSON blob it's
+    // meant to replace. Not read or written by api.php yet -- migrate-posts.php
+    // copies existing data in when we're ready to cut over, and only once
+    // the handlers are switched over does users.posts stop being the source
+    // of truth. Kept here (not just in api.php) so migrate-posts.php can
+    // create these tables too without duplicating the definitions.
+    //
+    // id keeps the existing "ownerId.timestamp" shape so comments.post_id,
+    // media.post_id and notifications.post_id -- and every client -- don't
+    // need to change.
+    $pdo->exec('CREATE TABLE IF NOT EXISTS posts (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        media_url TEXT,
+        created_at TEXT NOT NULL)');
+    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_posts_user_created ON posts(user_id, created_at)');
+
+    // One row per like, instead of an array embedded in the post. The
+    // primary key doubles as "can't like the same post twice".
+    $pdo->exec('CREATE TABLE IF NOT EXISTS post_likes (
+        post_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (post_id, user_id))');
+    // deleteAccount removes every like a departing user gave out.
+    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_post_likes_user ON post_likes(user_id)');
 }
