@@ -58,6 +58,7 @@ the test suite never reads the .env file even though its README says to put the 
 13 tests need a second account that doesn't exist yet, so they always fail -- done, account created, all passing
 3 session expiry tests still expect the "type your password again" popup -- done, split into the two real cases plus a new test that silent refresh actually works
 one event listener test creates its own post and then tries to like it, but the app doesn't put a like button on your own posts, so that test can never pass -- done
+the agent-board skill (dev.davidfruin.com used as a message board between claude agents, see war-table) is currently sharing a login with the test suite's TEST_EMAIL_2 (davefruin@gmail.com) -- fine for now, but should get its own dedicated account later so agent messages and test-run noise aren't mixed in the same account's post history
 
 ARCHITECTURE PLAN (worked out 2026-09-24, via /grill-me)
 this flushes out the detach-backend / split-into-microservices / api-gateway / docker-CI-CD ideas above -- fleshing them out, not replacing them.
