@@ -5,7 +5,7 @@ ALWAYS SIMPLER
 ALWAYS CLEANER LOOKING
 ALWAYS EASIER TO UNDERSTAND
 
-RULES: keep the cli, tui, api backend, web frontend, ios frontend and android frontend separate with only the interactive cli and tui built ontop of the cli.
+RULES: keep the cli, tui and api backend separate from the client UI layer, with only the interactive cli and tui built ontop of the cli. web and mobile don't have to be kept separate anymore -- see ARCHITECTURE PLAN, the react native app is meant to reuse from the web frontend.
 
 FEATURES
 allow links in post text -- done
@@ -43,7 +43,7 @@ interactive cli (wizard): typing a command with anything after it (e.g. "login m
 cli: `likes --json` printed the server's raw response including a meaningless "valid" field, the only --json command that didn't match the clean bare-object shape every other one uses -- done
 
 DATABASE
-posts are stored as one JSON blob in users.posts. it can't be indexed or queried, and two writes to the same user at the same time can overwrite each other. this is the biggest structural problem in the app -- deliberately not touched unattended, it's a real migration
+posts are stored as one JSON blob in users.posts -- code done, not deployed yet. real posts/post_likes tables added, all 11 handlers that touched users.posts switched over (post, deletePost, likePost, unlikePost, getPostLikes, getPostById, getPostPreviews, getMyPosts, getUserPosts, fetchFollowedPosts, deleteAccount), verified against a copy of dev's real database (109 posts/130 likes/19 users) -- every read matched the old code byte-for-byte except cosmetic tie order on same-second likes. also simplified post-id collision handling: now that posts.id is a real primary key, a collision fails the insert itself, so the retry loop doesn't need the BEGIN IMMEDIATE transaction from the earlier fix anymore. users.posts left in the schema untouched as a fallback until this is confirmed live. next: run migrate-posts.php on dev's actual db, deploy to dev, run the test suite, then prod once confirmed
 no foreign keys anywhere, so deleting a user leaves their media, comments and likes behind
 media has no index on post_id -- checked, this was wrong, nothing queries media by post_id. the real gap was a missing user_id index in the source code (the index existed on the live databases by hand but wasn't in any file) -- done
 the media table gets created in two different files (api.php and media.php) and the two definitions have to be kept matching by hand -- done, now defined once in schema.php
@@ -58,6 +58,15 @@ the test suite never reads the .env file even though its README says to put the 
 13 tests need a second account that doesn't exist yet, so they always fail -- done, account created, all passing
 3 session expiry tests still expect the "type your password again" popup -- done, split into the two real cases plus a new test that silent refresh actually works
 one event listener test creates its own post and then tries to like it, but the app doesn't put a like button on your own posts, so that test can never pass -- done
+
+ARCHITECTURE PLAN (worked out 2026-09-24, via /grill-me)
+this flushes out the detach-backend / split-into-microservices / api-gateway / docker-CI-CD ideas above -- fleshing them out, not replacing them.
+
+backend: staying php, staying a monolith for now -- not going to separately-deployed microservices unless it's actually needed later. refactoring api.php/media.php in place (strangler-style), not a rewrite. splitting into modules, each its own folder: auth, users, posts, comments, follows, notifications (includes push-subscription registration), media. can split further later. composer + PSR-4 autoloading (App\ -> src/) is in as of 2026-09-24 -- skeleton only, no dependencies yet, ready for the module split (vendor/ is gitignored and blocked in .htaccess since docroot == repo root). known issues get fixed as part of this migration, not deferred, including the posts-table migration above (that one goes before the folder reorg). deploy stays manual git pull for now -- moving to github actions deploying to the same server is the direction, but that's its own separate planning pass, not decided in detail yet.
+
+frontend: full recreation in typescript + vite + shadcn (currently vanilla js, no build step, no ts). not preserving the retro-BBS look in the rebuild -- that identity now lives in the terminal clients (cli/wizard/tui) instead. backend goes first, frontend rewrite starts once the backend's structure has settled.
+
+mobile: react native app built from/sharing with the new web frontend, once the web rewrite lands -- explicitly a bridge step toward eventual true-native (swift/kotlin) apps later, not the destination. this is why the old cli/tui/backend/web/ios/android-must-stay-separate rule above got loosened -- RN can reuse as much of the web frontend as makes sense. how much actually gets shared (just the logic/api-client layer vs UI-level sharing via a cross-platform kit) is deliberately left open until the react migration itself starts.
 
 PRIVACY
 this file is served publicly -- https://app.davidfruin.com/notes.md returns 200, so anyone can read the whole bug list. same for ARCHITECTURE.md. they should be blocked or moved out of the docroot -- needs an .htaccess change, which I'm not making without you asking directly
