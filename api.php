@@ -893,7 +893,16 @@ function handle_post($pdo, $user) {
         $mediaRow = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$mediaRow) bad('Invalid mediaUrl or not owned by user', 400);
     }
-    $newPost = ['id' => $uid . '.' . time(), 'text' => $text, 'timestamp' => date('Y-m-d H:i:s'), 'likes' => [], 'mediaUrl' => $rawMedia];
+    // Two posts in the same second used to get the same id ("$uid.$time"),
+    // and deleting either one deleted both, since comments/media/likes all
+    // reference a post by this one string. $posts is already loaded above,
+    // so checking it costs nothing extra - bump the second forward until
+    // it's free rather than changing the id's shape, which every client
+    // parses with split('.')/explode('.', ...)[0].
+    $existingIds = array_column($posts, 'id');
+    $newTime = time();
+    while (in_array($uid . '.' . $newTime, $existingIds, true)) $newTime++;
+    $newPost = ['id' => $uid . '.' . $newTime, 'text' => $text, 'timestamp' => date('Y-m-d H:i:s'), 'likes' => [], 'mediaUrl' => $rawMedia];
     array_unshift($posts, $newPost);
     $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
     $stmt->execute([json_encode($posts), $uid]);
