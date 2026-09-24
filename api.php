@@ -879,11 +879,6 @@ function handle_post($pdo, $user) {
     $mentionIds = extractMentions($text);
 
     $uid = $user['sub'];
-    $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
-    $stmt->execute([$uid]);
-    $postsJson = $stmt->fetchColumn();
-    $posts = $postsJson ? json_decode($postsJson, true) : [];
-    if (!is_array($posts)) $posts = [];
 
     $rawMedia = $_POST['mediaUrl'] ?? null;
     if ($rawMedia === 'null' || $rawMedia === '') $rawMedia = null;
@@ -893,19 +888,46 @@ function handle_post($pdo, $user) {
         $mediaRow = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$mediaRow) bad('Invalid mediaUrl or not owned by user', 400);
     }
-    // Two posts in the same second used to get the same id ("$uid.$time"),
-    // and deleting either one deleted both, since comments/media/likes all
-    // reference a post by this one string. $posts is already loaded above,
-    // so checking it costs nothing extra - bump the second forward until
-    // it's free rather than changing the id's shape, which every client
-    // parses with split('.')/explode('.', ...)[0].
-    $existingIds = array_column($posts, 'id');
-    $newTime = time();
-    while (in_array($uid . '.' . $newTime, $existingIds, true)) $newTime++;
-    $newPost = ['id' => $uid . '.' . $newTime, 'text' => $text, 'timestamp' => date('Y-m-d H:i:s'), 'likes' => [], 'mediaUrl' => $rawMedia];
-    array_unshift($posts, $newPost);
-    $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
-    $stmt->execute([json_encode($posts), $uid]);
+
+    // Two posts made in the same second used to get the same id
+    // ("$uid.$time"), and deleting either one deleted both, since
+    // comments/media/likes all reference a post by this one string.
+    //
+    // Checking the user's existing ids before picking a new one only closes
+    // half the gap: two requests arriving together both read $posts before
+    // either has written back, so both see the same array, both compute the
+    // same "first free second", and collide anyway - confirmed with two
+    // concurrent creates during testing. BEGIN IMMEDIATE takes SQLite's
+    // write lock up front, so a second connection's own BEGIN IMMEDIATE
+    // blocks until this one commits and can no longer see stale data.
+    // busy_timeout makes it wait for that lock instead of failing immediately
+    // with "database is locked".
+    $pdo->exec('PRAGMA busy_timeout = 5000');
+    $pdo->exec('BEGIN IMMEDIATE');
+    try {
+        $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
+        $stmt->execute([$uid]);
+        $postsJson = $stmt->fetchColumn();
+        $posts = $postsJson ? json_decode($postsJson, true) : [];
+        if (!is_array($posts)) $posts = [];
+
+        // Keeps the id's shape exactly as-is - every client parses it with
+        // split('.')/explode('.', ...)[0] and can't change without touching
+        // all of them - so a collision is avoided by bumping the second
+        // forward until one is free, not by changing what the id looks like.
+        $existingIds = array_column($posts, 'id');
+        $newTime = time();
+        while (in_array($uid . '.' . $newTime, $existingIds, true)) $newTime++;
+        $newPost = ['id' => $uid . '.' . $newTime, 'text' => $text, 'timestamp' => date('Y-m-d H:i:s'), 'likes' => [], 'mediaUrl' => $rawMedia];
+        array_unshift($posts, $newPost);
+        $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
+        $stmt->execute([json_encode($posts), $uid]);
+        $pdo->exec('COMMIT');
+    } catch (Exception $e) {
+        $pdo->exec('ROLLBACK');
+        throw $e;
+    }
+
     if ($rawMedia !== null) {
         $stmt = $pdo->prepare('UPDATE media SET post_id = ? WHERE path = ? AND user_id = ?');
         $stmt->execute([$newPost['id'], $rawMedia, $uid]);
