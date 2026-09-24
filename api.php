@@ -669,26 +669,17 @@ function handle_deleteAccount($pdo, $user) {
         }
     }
 
-    $stmt = $pdo->prepare('SELECT id, posts FROM users WHERE id != ?');
+    // This user's own posts, and every like anyone gave them; plus every
+    // like this user gave out on someone else's post.
+    $stmt = $pdo->prepare('SELECT id FROM posts WHERE user_id = ?');
     $stmt->execute([$uid]);
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $posts = $row['posts'] ? json_decode($row['posts'], true) : [];
-        if (is_array($posts)) {
-            $updated = false;
-            foreach ($posts as &$post) {
-                if (isset($post['likes']) && is_array($post['likes'])) {
-                    $originalCount = count($post['likes']);
-                    $post['likes'] = array_filter($post['likes'], fn($like) => (is_array($like) ? $like['userId'] : $like) != $uid);
-                    $post['likes'] = array_values($post['likes']);
-                    if (count($post['likes']) !== $originalCount) $updated = true;
-                }
-            }
-            if ($updated) {
-                $stmtUpdate = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
-                $stmtUpdate->execute([json_encode($posts), $row['id']]);
-            }
-        }
+    $ownPostIds = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id');
+    if ($ownPostIds) {
+        $placeholders = implode(',', array_fill(0, count($ownPostIds), '?'));
+        $pdo->prepare("DELETE FROM post_likes WHERE post_id IN ($placeholders)")->execute($ownPostIds);
     }
+    $pdo->prepare('DELETE FROM posts WHERE user_id = ?')->execute([$uid]);
+    $pdo->prepare('DELETE FROM post_likes WHERE user_id = ?')->execute([$uid]);
 
     $stmt = $pdo->prepare('DELETE FROM comments WHERE user_id = ?');
     $stmt->execute([$uid]);
@@ -799,29 +790,56 @@ function handle_markNotificationsSeen($pdo, $user) {
     respond(good(['message' => 'Notifications marked as seen']));
 }
 
+// ============== POST HELPERS (posts/post_likes tables) ==============
+// Likes used to live inside each post's JSON, as `likes: [{userId, timestamp}]`.
+// Handlers below still hand clients that exact shape -- these two functions
+// are what rebuilds it from the real post_likes table.
+
+// One query for a whole page of posts, not one query per post. Grouped by
+// post id, ordered oldest-first like the old JSON array naturally was
+// (likes were always appended, never reordered).
+function getLikesForPostIds($pdo, $postIds) {
+    if (empty($postIds)) return [];
+    $placeholders = implode(',', array_fill(0, count($postIds), '?'));
+    $stmt = $pdo->prepare("SELECT post_id, user_id, created_at FROM post_likes WHERE post_id IN ($placeholders) ORDER BY created_at ASC");
+    $stmt->execute($postIds);
+    $byPost = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $byPost[$row['post_id']][] = ['userId' => (int)$row['user_id'], 'timestamp' => $row['created_at']];
+    }
+    return $byPost;
+}
+
+// A posts-table row, in the shape handlers have always returned. Callers
+// still add userID/userEmail/mentions themselves, same as before.
+function postRowToApi($row, $likesByPost) {
+    return [
+        'id' => $row['id'],
+        'text' => $row['text'],
+        'timestamp' => $row['created_at'],
+        'likes' => $likesByPost[$row['id']] ?? [],
+        'mediaUrl' => $row['media_url'],
+    ];
+}
+
 function handle_getPostById($pdo, $user) {
     $postId = trim($_POST['postId'] ?? '');
     if (!$postId) bad('Post ID required', 400);
-    
-    $ownerId = (int)explode('.', $postId)[0];
-    $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
-    $stmt->execute([$ownerId]);
-    $postsJson = $stmt->fetchColumn();
-    $posts = json_decode($postsJson, true) ?? [];
-    
-    foreach ($posts as $post) {
-        if ($post['id'] === $postId) {
-            $ownerStmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
-            $ownerStmt->execute([$ownerId]);
-            $ownerEmail = $ownerStmt->fetchColumn() ?: '';
-            $post['userID'] = $ownerId;
-            $post['userEmail'] = $ownerEmail;
-            $post['mentions'] = hydrateMentions($pdo, $post['text']);
-            respond(good(['post' => $post]));
-            return;
-        }
-    }
-    bad('Post not found', 404);
+
+    $stmt = $pdo->prepare('SELECT id, user_id, text, media_url, created_at FROM posts WHERE id = ?');
+    $stmt->execute([$postId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) bad('Post not found', 404);
+
+    $ownerStmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
+    $ownerStmt->execute([$row['user_id']]);
+    $ownerEmail = $ownerStmt->fetchColumn() ?: '';
+
+    $post = postRowToApi($row, getLikesForPostIds($pdo, [$postId]));
+    $post['userID'] = (int)$row['user_id'];
+    $post['userEmail'] = $ownerEmail;
+    $post['mentions'] = hydrateMentions($pdo, $post['text']);
+    respond(good(['post' => $post]));
 }
 
 function handle_getPostPreviews($pdo, $user) {
@@ -832,30 +850,13 @@ function handle_getPostPreviews($pdo, $user) {
         return;
     }
 
-    $ownerIds = [];
-    foreach ($postIds as $pid) {
-        $ownerId = (int)explode('.', $pid)[0];
-        $ownerIds[$ownerId] = true;
-    }
-
-    $ids = array_keys($ownerIds);
-    if (empty($ids)) {
-        respond(good(['previews' => []]));
-        return;
-    }
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $stmt = $pdo->prepare('SELECT id, posts FROM users WHERE id IN (' . $placeholders . ')');
-    $stmt->execute($ids);
-    $rows = $stmt->fetchAll();
+    $placeholders = implode(',', array_fill(0, count($postIds), '?'));
+    $stmt = $pdo->prepare("SELECT id, text FROM posts WHERE id IN ($placeholders)");
+    $stmt->execute($postIds);
 
     $texts = [];
-    foreach ($rows as $row) {
-        $posts = json_decode($row['posts'], true) ?? [];
-        foreach ($posts as $post) {
-            if (in_array($post['id'], $postIds) && !empty($post['text'])) {
-                $texts[$post['id']] = $post['text'];
-            }
-        }
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        if (!empty($row['text'])) $texts[$row['id']] = $row['text'];
     }
 
     // Resolve the @[id] tokens before cutting, not after. Cutting first can
@@ -890,50 +891,36 @@ function handle_post($pdo, $user) {
     }
 
     // Two posts made in the same second used to get the same id
-    // ("$uid.$time"), and deleting either one deleted both, since
-    // comments/media/likes all reference a post by this one string.
-    //
-    // Checking the user's existing ids before picking a new one only closes
-    // half the gap: two requests arriving together both read $posts before
-    // either has written back, so both see the same array, both compute the
-    // same "first free second", and collide anyway - confirmed with two
-    // concurrent creates during testing. BEGIN IMMEDIATE takes SQLite's
-    // write lock up front, so a second connection's own BEGIN IMMEDIATE
-    // blocks until this one commits and can no longer see stale data.
-    // busy_timeout makes it wait for that lock instead of failing immediately
-    // with "database is locked".
-    $pdo->exec('PRAGMA busy_timeout = 5000');
-    $pdo->exec('BEGIN IMMEDIATE');
-    try {
-        $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
-        $stmt->execute([$uid]);
-        $postsJson = $stmt->fetchColumn();
-        $posts = $postsJson ? json_decode($postsJson, true) : [];
-        if (!is_array($posts)) $posts = [];
-
-        // Keeps the id's shape exactly as-is - every client parses it with
-        // split('.')/explode('.', ...)[0] and can't change without touching
-        // all of them - so a collision is avoided by bumping the second
-        // forward until one is free, not by changing what the id looks like.
-        $existingIds = array_column($posts, 'id');
-        $newTime = time();
-        while (in_array($uid . '.' . $newTime, $existingIds, true)) $newTime++;
-        $newPost = ['id' => $uid . '.' . $newTime, 'text' => $text, 'timestamp' => date('Y-m-d H:i:s'), 'likes' => [], 'mediaUrl' => $rawMedia];
-        array_unshift($posts, $newPost);
-        $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
-        $stmt->execute([json_encode($posts), $uid]);
-        $pdo->exec('COMMIT');
-    } catch (Exception $e) {
-        $pdo->exec('ROLLBACK');
-        throw $e;
+    // ("$uid.$time") and deleting either one deleted both, since
+    // comments/media/likes all reference a post by this one string. Now that
+    // posts.id is a PRIMARY KEY, a collision fails the INSERT itself -
+    // atomically, even between two genuinely concurrent requests - so
+    // bumping the second forward and retrying is enough on its own; no
+    // read-check-write lock needed the way the JSON array required.
+    $createdAt = date('Y-m-d H:i:s');
+    $newTime = time();
+    while (true) {
+        $postId = $uid . '.' . $newTime;
+        try {
+            // Re-prepared each attempt: PDO/SQLite leaves a statement in a
+            // "General error: 21 bad parameter or other API misuse" state
+            // after a constraint violation, so re-executing the same
+            // PDOStatement on the next loop fails even with fresh values.
+            $insert = $pdo->prepare('INSERT INTO posts (id, user_id, text, media_url, created_at) VALUES (?, ?, ?, ?, ?)');
+            $insert->execute([$postId, $uid, $text, $rawMedia, $createdAt]);
+            break;
+        } catch (PDOException $e) {
+            if ($e->getCode() !== '23000') throw $e; // not a uniqueness failure
+            $newTime++;
+        }
     }
 
     if ($rawMedia !== null) {
         $stmt = $pdo->prepare('UPDATE media SET post_id = ? WHERE path = ? AND user_id = ?');
-        $stmt->execute([$newPost['id'], $rawMedia, $uid]);
+        $stmt->execute([$postId, $rawMedia, $uid]);
     }
-    notifyMentions($pdo, $mentionIds, $uid, $user['email'], $newPost['id']);
-    respond(good(['postId' => $newPost['id']]));
+    notifyMentions($pdo, $mentionIds, $uid, $user['email'], $postId);
+    respond(good(['postId' => $postId]));
 }
 
 function handle_getMyPosts($pdo, $user) {
@@ -941,21 +928,24 @@ function handle_getMyPosts($pdo, $user) {
     $offset = isset($_POST['offset']) ? (int)$_POST['offset'] : 0;
     $uid = $user['sub'];
 
-    $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
-    $stmt->execute([$uid]);
-    $postsJson = $stmt->fetchColumn();
-    $posts = $postsJson ? json_decode($postsJson, true) : [];
-    if (!is_array($posts)) $posts = [];
+    $countStmt = $pdo->prepare('SELECT COUNT(*) FROM posts WHERE user_id = ?');
+    $countStmt->execute([$uid]);
+    $totalCount = (int)$countStmt->fetchColumn();
 
-    $totalCount = count($posts);
-    foreach ($posts as &$post) {
+    $stmt = $pdo->prepare("SELECT id, user_id, text, media_url, created_at FROM posts WHERE user_id = ? ORDER BY created_at DESC LIMIT $limit OFFSET $offset");
+    $stmt->execute([$uid]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $likesByPost = getLikesForPostIds($pdo, array_column($rows, 'id'));
+    $posts = [];
+    foreach ($rows as $row) {
+        $post = postRowToApi($row, $likesByPost);
         $post['userID'] = $uid;
         $post['userEmail'] = $user['email'];
+        $post['mentions'] = hydrateMentions($pdo, $post['text']);
+        $posts[] = $post;
     }
-    usort($posts, fn($a, $b) => strtotime($b['timestamp'] ?? '') <=> strtotime($a['timestamp'] ?? ''));
-    $posts = array_slice($posts, $offset, $limit);
     $hasMore = ($offset + $limit) < $totalCount;
-    foreach ($posts as &$post) $post['mentions'] = hydrateMentions($pdo, $post['text']);
 
     respond(good(['posts' => $posts, 'hasMore' => $hasMore, 'totalCount' => $totalCount]));
 }
@@ -967,24 +957,28 @@ function handle_getUserPosts($pdo, $user) {
     $limit = isset($_POST['limit']) ? (int)$_POST['limit'] : 25;
     $offset = isset($_POST['offset']) ? (int)$_POST['offset'] : 0;
 
-    $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
-    $stmt->execute([$targetId]);
-    $postsJson = $stmt->fetchColumn();
-    $posts = $postsJson ? json_decode($postsJson, true) : [];
-    if (!is_array($posts)) $posts = [];
+    $countStmt = $pdo->prepare('SELECT COUNT(*) FROM posts WHERE user_id = ?');
+    $countStmt->execute([$targetId]);
+    $totalCount = (int)$countStmt->fetchColumn();
 
-    $totalCount = count($posts);
-    $stmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
+    $emailStmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
+    $emailStmt->execute([$targetId]);
+    $targetEmail = $emailStmt->fetchColumn() ?: 'User ' . $targetId;
+
+    $stmt = $pdo->prepare("SELECT id, user_id, text, media_url, created_at FROM posts WHERE user_id = ? ORDER BY created_at DESC LIMIT $limit OFFSET $offset");
     $stmt->execute([$targetId]);
-    $targetEmail = $stmt->fetchColumn() ?: 'User ' . $targetId;
-    foreach ($posts as &$post) {
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $likesByPost = getLikesForPostIds($pdo, array_column($rows, 'id'));
+    $posts = [];
+    foreach ($rows as $row) {
+        $post = postRowToApi($row, $likesByPost);
         $post['userID'] = $targetId;
         $post['userEmail'] = $targetEmail;
+        $post['mentions'] = hydrateMentions($pdo, $post['text']);
+        $posts[] = $post;
     }
-    usort($posts, fn($a, $b) => strtotime($b['timestamp'] ?? '') <=> strtotime($a['timestamp'] ?? ''));
-    $posts = array_slice($posts, $offset, $limit);
     $hasMore = ($offset + $limit) < $totalCount;
-    foreach ($posts as &$post) $post['mentions'] = hydrateMentions($pdo, $post['text']);
 
     respond(good(['posts' => $posts, 'hasMore' => $hasMore, 'totalCount' => $totalCount]));
 }
@@ -1084,36 +1078,35 @@ function handle_fetchFollowedPosts($pdo, $user) {
     $followsJson = $stmt->fetchColumn() ?: '[]';
     $followedData = json_decode($followsJson, true) ?? [];
 
-    $followedIds = array_unique(array_merge(array_map(fn($f) => is_array($f) ? $f['id'] : $f, $followedData), [$uid]));
+    // Always includes $uid, so this is never empty and the IN (...) below
+    // always has at least one placeholder.
+    $followedIds = array_values(array_unique(array_merge(array_map(fn($f) => is_array($f) ? $f['id'] : $f, $followedData), [$uid])));
+    $placeholders = implode(',', array_fill(0, count($followedIds), '?'));
+
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM posts WHERE user_id IN ($placeholders)");
+    $countStmt->execute($followedIds);
+    $totalCount = (int)$countStmt->fetchColumn();
+
+    // One query across every followed user, ordered and paged in SQL,
+    // instead of pulling each user's whole post list into PHP to merge and
+    // sort by hand.
+    $stmt = $pdo->prepare("SELECT posts.id, posts.user_id, posts.text, posts.media_url, posts.created_at, users.email
+        FROM posts JOIN users ON users.id = posts.user_id
+        WHERE posts.user_id IN ($placeholders)
+        ORDER BY posts.created_at DESC LIMIT $limit OFFSET $offset");
+    $stmt->execute($followedIds);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $likesByPost = getLikesForPostIds($pdo, array_column($rows, 'id'));
     $allPosts = [];
-    $userIdToEmail = [];
-
-    if (!empty($followedIds)) {
-        $placeholders = implode(',', array_fill(0, count($followedIds), '?'));
-        $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id IN ($placeholders)");
-        $stmt->execute(array_values($followedIds));
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $userIdToEmail[$row['id']] = $row['email'];
+    foreach ($rows as $row) {
+        $post = postRowToApi($row, $likesByPost);
+        $post['userID'] = (int)$row['user_id'];
+        $post['userEmail'] = $row['email'];
+        $post['mentions'] = hydrateMentions($pdo, $post['text']);
+        $allPosts[] = $post;
     }
-
-    foreach ($followedIds as $fid) {
-        $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
-        $stmt->execute([$fid]);
-        $postsJson = $stmt->fetchColumn();
-        if ($postsJson) {
-            $userPosts = json_decode($postsJson, true) ?? [];
-            foreach ($userPosts as $post) {
-                $post['userID'] = $fid;
-                $post['userEmail'] = $userIdToEmail[$fid] ?? 'User ' . $fid;
-                $allPosts[] = $post;
-            }
-        }
-    }
-
-    usort($allPosts, fn($a, $b) => strtotime($b['timestamp'] ?? '') <=> strtotime($a['timestamp'] ?? ''));
-    $totalCount = count($allPosts);
-    $allPosts = array_slice($allPosts, $offset, $limit);
     $hasMore = ($offset + $limit) < $totalCount;
-    foreach ($allPosts as &$post) $post['mentions'] = hydrateMentions($pdo, $post['text']);
 
     respond(good(['posts' => $allPosts, 'hasMore' => $hasMore, 'totalCount' => $totalCount]));
 }
@@ -1122,42 +1115,27 @@ function handle_likePost($pdo, $user) {
     $postId = trim($_POST['postId'] ?? '');
     if (!$postId) bad('Missing post ID', 400);
 
+    // Checked against the id's own prefix, before touching the posts table,
+    // same as before the tables existed - so this still rejects a self-like
+    // even for a postId that turns out not to exist.
     $ownerId = (int)explode('.', $postId)[0];
     if ($ownerId == $user['sub']) bad('Cannot like your own post', 400);
 
-    // Get current user's email for notification
     $stmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
     $stmt->execute([$user['sub']]);
-    $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
-    $actorEmail = $userRow['email'] ?? 'Unknown';
+    $actorEmail = $stmt->fetchColumn() ?: 'Unknown';
 
-    $stmt = $pdo->prepare('SELECT posts, email FROM users WHERE id = ?');
-    $stmt->execute([$ownerId]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) bad('Post owner not found', 404);
+    $stmt = $pdo->prepare('SELECT user_id FROM posts WHERE id = ?');
+    $stmt->execute([$postId]);
+    $realOwnerId = $stmt->fetchColumn();
+    if ($realOwnerId === false) bad('Post not found', 404);
 
-    $postsJson = $row['posts'];
-    $posts = json_decode($postsJson, true) ?? [];
-    $postFound = false;
-
-    foreach ($posts as &$post) {
-        if ($post['id'] === $postId) {
-            $postFound = true;
-            if (!isset($post['likes'])) $post['likes'] = [];
-            $alreadyLiked = in_array($user['sub'], array_column($post['likes'], 'userId'));
-            if (!$alreadyLiked) {
-                $post['likes'][] = ['userId' => $user['sub'], 'timestamp' => date('Y-m-d H:i:s')];
-                if ($ownerId != $user['sub']) {
-                    createNotification($pdo, $ownerId, $user['sub'], $actorEmail, 'like', $postId);
-                }
-            }
-            break;
-        }
+    $insert = $pdo->prepare('INSERT OR IGNORE INTO post_likes (post_id, user_id, created_at) VALUES (?, ?, ?)');
+    $insert->execute([$postId, $user['sub'], date('Y-m-d H:i:s')]);
+    if ($insert->rowCount() > 0) {
+        createNotification($pdo, (int)$realOwnerId, $user['sub'], $actorEmail, 'like', $postId);
     }
-    if (!$postFound) bad('Post not found', 404);
 
-    $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
-    $stmt->execute([json_encode($posts), $ownerId]);
     respond(good(['liked' => true]));
 }
 
@@ -1165,43 +1143,23 @@ function handle_unlikePost($pdo, $user) {
     $postId = trim($_POST['postId'] ?? '');
     if (!$postId) bad('Missing post ID', 400);
 
-    $ownerId = (int)explode('.', $postId)[0];
+    $stmt = $pdo->prepare('SELECT user_id FROM posts WHERE id = ?');
+    $stmt->execute([$postId]);
+    $ownerId = $stmt->fetchColumn();
+    if ($ownerId === false) bad('Post not found', 404);
+    $ownerId = (int)$ownerId;
 
-    // Get current user's email for notification
     $stmt = $pdo->prepare('SELECT email FROM users WHERE id = ?');
     $stmt->execute([$user['sub']]);
-    $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
-    $actorEmail = $userRow['email'] ?? 'Unknown';
+    $actorEmail = $stmt->fetchColumn() ?: 'Unknown';
 
-    $stmt = $pdo->prepare('SELECT posts, email FROM users WHERE id = ?');
-    $stmt->execute([$ownerId]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) bad('Post owner not found', 404);
-
-    $postsJson = $row['posts'];
-    $posts = json_decode($postsJson, true) ?? [];
-
-    $postFound = false;
-    $wasLiked = false;
-    foreach ($posts as &$post) {
-        if ($post['id'] === $postId) {
-            $postFound = true;
-            if (isset($post['likes'])) {
-                $before = count($post['likes']);
-                $post['likes'] = array_filter($post['likes'], fn($like) => $like['userId'] != $user['sub']);
-                $post['likes'] = array_values($post['likes']);
-                $wasLiked = count($post['likes']) < $before;
-                if ($wasLiked && $ownerId != $user['sub']) {
-                    createNotification($pdo, $ownerId, $user['sub'], $actorEmail, 'unlike', $postId);
-                }
-            }
-            break;
-        }
+    $delete = $pdo->prepare('DELETE FROM post_likes WHERE post_id = ? AND user_id = ?');
+    $delete->execute([$postId, $user['sub']]);
+    $wasLiked = $delete->rowCount() > 0;
+    if ($wasLiked && $ownerId != $user['sub']) {
+        createNotification($pdo, $ownerId, $user['sub'], $actorEmail, 'unlike', $postId);
     }
-    if (!$postFound) bad('Post not found', 404);
 
-    $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
-    $stmt->execute([json_encode($posts), $ownerId]);
     respond(good(['liked' => false]));
 }
 
@@ -1209,22 +1167,11 @@ function handle_getPostLikes($pdo, $user) {
     $postId = trim($_POST['postId'] ?? '');
     if (!$postId) bad('Missing post ID', 400);
 
-    $ownerId = (int)explode('.', $postId)[0];
-    $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
-    $stmt->execute([$ownerId]);
-    $postsJson = $stmt->fetchColumn();
-    if (!$postsJson) bad('Post not found', 404);
+    $stmt = $pdo->prepare('SELECT 1 FROM posts WHERE id = ?');
+    $stmt->execute([$postId]);
+    if (!$stmt->fetchColumn()) bad('Post not found', 404);
 
-    $posts = json_decode($postsJson, true) ?? [];
-    $likes = [];
-
-    foreach ($posts as &$post) {
-        if (isset($post['id']) && $post['id'] === $postId) {
-            $likes = $post['likes'] ?? [];
-            break;
-        }
-    }
-
+    $likes = getLikesForPostIds($pdo, [$postId])[$postId] ?? [];
     respond(good(['likes' => $likes]));
 }
 
@@ -1294,32 +1241,18 @@ function handle_deletePost($pdo, $user) {
     $postId = trim($_POST['postId'] ?? '');
     if (!$postId) bad('Missing post ID', 400);
 
-    $ownerId = (int)explode('.', $postId)[0];
-    if ($ownerId != $user['sub']) bad('You can only delete your own posts', 403);
-
-    $stmt = $pdo->prepare('SELECT posts FROM users WHERE id = ?');
-    $stmt->execute([$user['sub']]);
-    $postsJson = $stmt->fetchColumn() ?: '[]';
-    $posts = json_decode($postsJson, true) ?? [];
-
-    $postToDelete = null;
-    foreach ($posts as $post) {
-        if ($post['id'] === $postId) {
-            $postToDelete = $post;
-            break;
-        }
-    }
-
-    $newPosts = array_filter($posts, fn($post) => $post['id'] !== $postId);
-    $newPosts = array_values($newPosts);
-    $stmt = $pdo->prepare('UPDATE users SET posts = ? WHERE id = ?');
-    $stmt->execute([json_encode($newPosts), $user['sub']]);
-
-    $stmt = $pdo->prepare('DELETE FROM notifications WHERE post_id = ?');
+    $stmt = $pdo->prepare('SELECT user_id, media_url FROM posts WHERE id = ?');
     $stmt->execute([$postId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) bad('Post not found', 404);
+    if ((int)$row['user_id'] != $user['sub']) bad('You can only delete your own posts', 403);
 
-    if ($postToDelete && !empty($postToDelete['mediaUrl']) && $postToDelete['mediaUrl'] !== 'null') {
-        $mediaUrl = $postToDelete['mediaUrl'];
+    $pdo->prepare('DELETE FROM posts WHERE id = ?')->execute([$postId]);
+    $pdo->prepare('DELETE FROM post_likes WHERE post_id = ?')->execute([$postId]);
+    $pdo->prepare('DELETE FROM notifications WHERE post_id = ?')->execute([$postId]);
+
+    $mediaUrl = $row['media_url'];
+    if (!empty($mediaUrl) && $mediaUrl !== 'null') {
         if (strpos($mediaUrl, '..') === false && strpos($mediaUrl, '/') === 0) {
             $stmt = $pdo->prepare('SELECT id, path FROM media WHERE path = ? AND user_id = ?');
             $stmt->execute([$mediaUrl, $user['sub']]);
