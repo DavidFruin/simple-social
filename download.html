@@ -40,15 +40,17 @@
 
                     <p>1. Install the build tools:</p>
                     <div class="code-block">
-                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential</code></pre>
-                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential">Copy</button>
+                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libcurl4 pkg-config</code></pre>
+                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libcurl4 pkg-config">Copy</button>
                     </div>
 
-                    <p>2. Clone the repo:</p>
+                    <p>2. Clone the repo, somewhere you own &mdash; your home directory is fine:</p>
                     <div class="code-block">
-                        <pre><code>git clone https://github.com/DavidFruin/simple-social-cli.git</code></pre>
-                        <button class="copy-btn" data-copy="git clone https://github.com/DavidFruin/simple-social-cli.git">Copy</button>
+                        <pre><code>cd ~ &amp;&amp; git clone https://github.com/DavidFruin/simple-social-cli.git</code></pre>
+                        <button class="copy-btn" data-copy="cd ~ && git clone https://github.com/DavidFruin/simple-social-cli.git">Copy</button>
                     </div>
+
+                    <p>Cloning from <code>/</code> or another root-owned directory fails with <code>could not create work tree dir ... Permission denied</code>. Don't run the clone itself with <code>sudo</code> either &mdash; that leaves a root-owned copy that <code>make</code> then can't write to.</p>
 
                     <p>3. Build and install it:</p>
                     <div class="code-block">
@@ -58,22 +60,22 @@
 
                     <p>This builds it and copies it to <code>/usr/local/bin/sscli</code>, so you can run it as <code>sscli</code> from anywhere (<code>sudo make uninstall</code> to remove it). If you'd rather not install it system-wide, run <code>cd simple-social-cli &amp;&amp; make</code> instead, then use it as <code>./simple-social-cli --help</code> from inside that folder.</p>
 
-                    <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
-
                     <h2>Interactive CLI</h2>
                     <p>A guided command-line client that prompts you for each step. It's a standalone download &mdash; you don't need the CLI above unless you want it too. Builds from source on <strong>Debian and Ubuntu only</strong> for now (Arch and Nix support is coming soon).</p>
 
                     <p>1. Install the build tools:</p>
                     <div class="code-block">
-                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential</code></pre>
-                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential">Copy</button>
+                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libcurl4 pkg-config</code></pre>
+                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libcurl4 pkg-config">Copy</button>
                     </div>
 
-                    <p>2. Clone the repo (<code>--recursive</code> also fetches the small library it's built on):</p>
+                    <p>2. Clone the repo, somewhere you own &mdash; your home directory is fine. <code>--recursive</code> also fetches the small library it's built on:</p>
                     <div class="code-block">
-                        <pre><code>git clone --recursive https://github.com/DavidFruin/simple-social-cli-interactive.git</code></pre>
-                        <button class="copy-btn" data-copy="git clone --recursive https://github.com/DavidFruin/simple-social-cli-interactive.git">Copy</button>
+                        <pre><code>cd ~ &amp;&amp; git clone --recursive https://github.com/DavidFruin/simple-social-cli-interactive.git</code></pre>
+                        <button class="copy-btn" data-copy="cd ~ && git clone --recursive https://github.com/DavidFruin/simple-social-cli-interactive.git">Copy</button>
                     </div>
+
+                    <p>Cloning from <code>/</code> or another root-owned directory fails with <code>could not create work tree dir ... Permission denied</code>. Don't run the clone itself with <code>sudo</code> either &mdash; that leaves a root-owned copy that <code>make</code> then can't write to.</p>
 
                     <p>3. Build and install it:</p>
                     <div class="code-block">
@@ -83,22 +85,24 @@
 
                     <p>This builds it and copies it to <code>/usr/local/bin/sswiz</code>, so you can run it as <code>sswiz</code> from anywhere (<code>sudo make uninstall</code> to remove it). If you'd rather not install it system-wide, run <code>cd simple-social-cli-interactive &amp;&amp; make</code> instead, then use it as <code>./simple-social-cli-interactive</code> from inside that folder.</p>
 
-                    <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
-
                     <h2>TUI</h2>
                     <p>A full-screen terminal interface you navigate with the keyboard. It's a standalone download &mdash; you don't need the CLI above unless you want it too. Debian and Ubuntu only for now, same as the CLI.</p>
 
                     <p>1. Install the build tools and ncurses:</p>
                     <div class="code-block">
-                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libncurses-dev</code></pre>
-                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libncurses-dev">Copy</button>
+                        <pre><code>sudo apt update &amp;&amp; sudo apt install -y build-essential libncurses-dev libcurl4 pkg-config</code></pre>
+                        <button class="copy-btn" data-copy="sudo apt update && sudo apt install -y build-essential libncurses-dev libcurl4 pkg-config">Copy</button>
                     </div>
 
-                    <p>2. Clone the repo (<code>--recursive</code> also fetches the small library it's built on):</p>
+                    <p>If <code>apt update</code> fails because of a broken third-party repository (for example a missing signing key), run the install on its own instead of chained after it &mdash; the failed update stops the whole line from ever reaching the install.</p>
+
+                    <p>2. Clone the repo, somewhere you own &mdash; your home directory is fine. <code>--recursive</code> also fetches the small library it's built on:</p>
                     <div class="code-block">
-                        <pre><code>git clone --recursive https://github.com/DavidFruin/simple-social-tui.git</code></pre>
-                        <button class="copy-btn" data-copy="git clone --recursive https://github.com/DavidFruin/simple-social-tui.git">Copy</button>
+                        <pre><code>cd ~ &amp;&amp; git clone --recursive https://github.com/DavidFruin/simple-social-tui.git</code></pre>
+                        <button class="copy-btn" data-copy="cd ~ && git clone --recursive https://github.com/DavidFruin/simple-social-tui.git">Copy</button>
                     </div>
+
+                    <p>Cloning from <code>/</code> or another root-owned directory fails with <code>could not create work tree dir ... Permission denied</code>. Don't run the clone itself with <code>sudo</code> either &mdash; that leaves a root-owned copy that <code>make</code> then can't write to.</p>
 
                     <p>3. Build and install it:</p>
                     <div class="code-block">
@@ -107,8 +111,6 @@
                     </div>
 
                     <p>This builds it and copies it to <code>/usr/local/bin/sstui</code>, so you can run it as <code>sstui</code> from anywhere (<code>sudo make uninstall</code> to remove it). If you'd rather not install it system-wide, run <code>cd simple-social-tui &amp;&amp; make</code> instead, then use it as <code>./simple-social-tui</code> from inside that folder. The first time you run it you'll land on a login screen, where you can log in, register, or reset a forgotten password. Each of the three terminal tools signs in on its own, so logging into one doesn't log you into the others.</p>
-
-                    <p>The build needs <code>libcurl</code>, which is almost always already installed on Debian/Ubuntu. If <code>make</code> fails with a curl-related error, run <code>sudo apt install -y libcurl4t64</code> (newer systems) or <code>sudo apt install -y libcurl4</code> (older systems), then run <code>make</code> again.</p>
                 </div>
             </div>
         </main>
