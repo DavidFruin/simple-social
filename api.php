@@ -336,56 +336,10 @@ function handle_deleteAccount($pdo, $user) {
 // handle_getMyFollowers, handle_getMyFollows moved to
 // src/Follows/handlers.php.
 
-function handle_getNotifications($pdo, $user) {
-    $offset = isset($_POST['offset']) ? (int)$_POST['offset'] : 0;
-    $limit = 25;
-    // Every other type can't target yourself in the first place (you can't
-    // follow/like/comment-notify yourself), but a mention can - self-mentions
-    // are meant to notify like any other, so they're exempted here rather
-    // than excluded by the general actor_id != recipient_id noise filter.
-    $stmt = $pdo->prepare('SELECT n.id, n.recipient_id, n.actor_id, COALESCE(u.email, n.actor_email) AS actor_email, n.type, n.post_id, n.created_at FROM notifications n LEFT JOIN users u ON n.actor_id = u.id WHERE n.recipient_id = ? AND (n.actor_id != ? OR n.type = \'mention\') ORDER BY n.created_at DESC LIMIT ? OFFSET ?');
-    $stmt->execute([$user['sub'], $user['sub'], $limit, $offset]);
-    respond(good(['notifications' => $stmt->fetchAll(PDO::FETCH_ASSOC)]));
-}
+// handle_getNotifications, getUnseenNotificationCount,
+// handle_getUnseenNotificationCount, handle_markNotificationsSeen moved to
+// src/Notifications/handlers.php.
 
-// Shared with pushNotification() so a push payload's embedded count is
-// computed the exact same way the notifications page's own count is -- the
-// service worker re-asserts this value against the OS badge on every
-// notification interaction it sees, so it has to match.
-function getUnseenNotificationCount($pdo, $userId) {
-    $stmt = $pdo->prepare('SELECT last_notifications_seen_at FROM users WHERE id = ?');
-    $stmt->execute([$userId]);
-    $lastSeen = $stmt->fetchColumn();
-
-    if (!$lastSeen) {
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND (actor_id != ? OR type = \'mention\')');
-        $stmt->execute([$userId, $userId]);
-    } else {
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND (actor_id != ? OR type = \'mention\') AND created_at > ?');
-        $stmt->execute([$userId, $userId, $lastSeen]);
-    }
-
-    return (int)$stmt->fetchColumn();
-}
-
-function handle_getUnseenNotificationCount($pdo, $user) {
-    respond(good(['count' => getUnseenNotificationCount($pdo, $user['sub'])]));
-}
-
-function handle_markNotificationsSeen($pdo, $user) {
-    $stmt = $pdo->prepare('UPDATE users SET last_notifications_seen_at = ? WHERE id = ?');
-    $stmt->execute([date('Y-m-d H:i:s'), $user['sub']]);
-    respond(good(['message' => 'Notifications marked as seen']));
-}
-
-// ============== POST HELPERS (posts/post_likes tables) ==============
-// Likes used to live inside each post's JSON, as `likes: [{userId, timestamp}]`.
-// Handlers below still hand clients that exact shape -- these two functions
-// are what rebuilds it from the real post_likes table.
-
-// One query for a whole page of posts, not one query per post. Grouped by
-// post id, ordered oldest-first like the old JSON array naturally was
-// (likes were always appended, never reordered).
 // getLikesForPostIds, postRowToApi, handle_getPostById, handle_getPostPreviews,
 // handle_post, handle_getMyPosts, handle_getUserPosts moved to
 // src/Posts/handlers.php.
@@ -394,33 +348,8 @@ function handle_markNotificationsSeen($pdo, $user) {
 // handle_getMyInfo, handle_updateTheme, handle_updateHand moved to
 // src/Users/handlers.php.
 
-function handle_getVapidPublicKey($pdo, $user) {
-    global $CONFIG;
-    respond(good(['key' => $CONFIG['vapid_public'] ?? '']));
-}
-
-function handle_savePushSubscription($pdo, $user) {
-    $endpoint = trim($_POST['endpoint'] ?? '');
-    $p256dh = trim($_POST['p256dh'] ?? '');
-    $auth = trim($_POST['auth'] ?? '');
-    if (!$endpoint || !$p256dh || !$auth) bad('Missing subscription details', 400);
-    if (!filter_var($endpoint, FILTER_VALIDATE_URL)) bad('Invalid endpoint', 400);
-
-    // Recorded against the session that enabled it, so revoking a device
-    // also silences its notifications.
-    $stmt = $pdo->prepare('INSERT OR REPLACE INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at, session_id) VALUES (?, ?, ?, ?, ?, ?)');
-    $stmt->execute([$user['sub'], $endpoint, $p256dh, $auth, date('Y-m-d H:i:s'), $user['sid'] ?? null]);
-    respond(good(['message' => 'Push enabled']));
-}
-
-function handle_deletePushSubscription($pdo, $user) {
-    $endpoint = trim($_POST['endpoint'] ?? '');
-    if (!$endpoint) bad('Missing endpoint', 400);
-
-    $stmt = $pdo->prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?');
-    $stmt->execute([$endpoint, $user['sub']]);
-    respond(good(['message' => 'Push disabled']));
-}
+// handle_getVapidPublicKey, handle_savePushSubscription,
+// handle_deletePushSubscription moved to src/Notifications/handlers.php.
 
 // handle_updateHand moved to src/Users/handlers.php.
 
