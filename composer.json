@@ -11,7 +11,8 @@
             "App\\": "src/"
         },
         "files": [
-            "src/Auth/handlers.php"
+            "src/Auth/handlers.php",
+            "src/Users/handlers.php"
         ]
     }
 }
