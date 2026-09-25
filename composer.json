@@ -16,7 +16,8 @@
             "src/Posts/handlers.php",
             "src/Comments/handlers.php",
             "src/Follows/handlers.php",
-            "src/Notifications/handlers.php"
+            "src/Notifications/handlers.php",
+            "src/Media/handlers.php"
         ]
     }
 }
