@@ -1,17 +1,25 @@
 // components/session-expired-modal.js - Session Expired Re-login Modal
+//
+// Page load fires more than one authenticated request at once (main.js
+// renders the feed while header.js's own DOMContentLoaded handler starts
+// polling notifications, independently) - with an expired session, both
+// can 401 around the same moment and both call show(). _waiters queues
+// every caller waiting on this one login, rather than a single {resolve,
+// retryFn} slot: a second concurrent call used to silently overwrite the
+// first's, orphaning its promise forever (nothing left to resolve it),
+// which is what showed up as a page stuck on "Loading..." after re-login -
+// the caller that got clobbered never found out login succeeded.
 const SessionExpiredModal = {
-  _resolve: null,
-  _retryFn: null,
+  _waiters: [], // [{ resolve, retryFn }, ...] - one entry per concurrent caller
   _showing: false,
 
   show(retryFn) {
-    if (this._showing && this._resolve) {
-      this._retryFn = retryFn;
-      return new Promise(resolve => { this._resolve = resolve; });
-    }
+    const promise = new Promise(resolve => {
+      this._waiters.push({ resolve, retryFn });
+    });
 
+    if (this._showing) return promise;
     this._showing = true;
-    this._retryFn = retryFn;
 
     const user = Store.getUser();
     const email = user?.email || 'Unknown';
@@ -42,9 +50,7 @@ const SessionExpiredModal = {
       document.getElementById('session-relogin-password')?.focus();
     }, 100);
 
-    return new Promise(resolve => {
-      this._resolve = resolve;
-    });
+    return promise;
   },
 
   async handleRelogin(e) {
@@ -72,20 +78,25 @@ const SessionExpiredModal = {
           created_at: userInfo.created_at
         });
 
-        const resolve = this._resolve;
-        const retryFn = this._retryFn;
+        const waiters = this._waiters;
+        this._waiters = [];
         this.close();
 
-        let retryResult;
-        if (retryFn) {
-          try {
-            retryResult = await retryFn();
-          } catch (err) {
-            retryResult = undefined;
+        // Each waiter is a separate caller's original failed request - its
+        // own retry, resolved with its own result. Sequential rather than
+        // Promise.all so one throwing can't stop the others from finishing;
+        // errors below already fall back to undefined, same as before.
+        for (const { resolve, retryFn } of waiters) {
+          let retryResult;
+          if (retryFn) {
+            try {
+              retryResult = await retryFn();
+            } catch (err) {
+              retryResult = undefined;
+            }
           }
+          resolve(retryResult);
         }
-
-        if (resolve) resolve(retryResult);
       } else {
         throw new Error('No JWT received');
       }
@@ -102,6 +113,14 @@ const SessionExpiredModal = {
 
   handleLogout(e) {
     e.preventDefault();
+    // Every waiter's original request is moot once we're headed to the
+    // login page - resolve them with undefined rather than leaving them
+    // hanging (the previous single-slot version left its one _resolve
+    // uncalled here; harmless when there was at most one caller, but with
+    // a queue that would pile up unresolved promises instead of just one).
+    const waiters = this._waiters;
+    this._waiters = [];
+    for (const { resolve } of waiters) resolve(undefined);
     this.close();
     Store.clear();
     Router.navigate('/login');
@@ -110,8 +129,6 @@ const SessionExpiredModal = {
   close() {
     const overlay = document.getElementById('session-modal-overlay');
     if (overlay) overlay.remove();
-    this._resolve = null;
-    this._retryFn = null;
     this._showing = false;
   }
 };

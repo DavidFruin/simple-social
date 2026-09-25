@@ -81,6 +81,18 @@ const SearchPage = {
 
       loading?.classList.add('hidden');
       this.renderUsersList();
+
+      // attachEventListeners() wires up the search input synchronously, but
+      // this.users is only populated once this fetch resolves. If someone
+      // typed a query before it did (a fast typist, a slow connection, or a
+      // test filling the input right after it appears), filterUsers() ran
+      // against an empty list and showed a false "no users matching"
+      // empty state. Re-run the filter now that real data exists, so a
+      // query already sitting in the box gets corrected rather than left
+      // wrong until the next keystroke.
+      const input = document.getElementById('search-input');
+      const pendingQuery = input?.value.trim();
+      if (pendingQuery) this.filterUsers(pendingQuery);
     } catch (err) {
       loading?.classList.add('hidden');
       showError(err.message);
