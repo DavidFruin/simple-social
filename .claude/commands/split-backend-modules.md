@@ -53,7 +53,11 @@ getSessions, revokeSession, revokeAllOtherSessions
 updateTheme, updateHand
 
 **`src/Posts/`** — post, getMyPosts, getUserPosts, fetchFollowedPosts,
-deletePost, getPostById, getPostPreviews
+deletePost, getPostById, getPostPreviews, likePost, unlikePost,
+getPostLikes (**corrected 2026-09-24**: the original version of this list
+never assigned the three like handlers anywhere. post_likes is post-scoped
+data sharing `getLikesForPostIds()`/`postRowToApi()` with every other
+posts handler, so they belong here.)
 
 **`src/Comments/`** — createComment, getPostComments, deleteComment,
 getPostCommentCounts
@@ -66,7 +70,21 @@ markNotificationsSeen, getVapidPublicKey, savePushSubscription,
 deletePushSubscription
 
 **`src/Media/`** — uploadMedia, deleteMedia (currently `media.php` — becomes
-its own module folder as-is, no behavior change, just the move)
+its own module folder as-is, no behavior change, just the move). **Watch
+for `__DIR__`** here especially — `media.php` already has three uses of it
+(`mediaDir()`, `db_path`, `log_dir` fallbacks) that meant the repo root and
+will mean `src/Media/` instead once moved. See the `__DIR__` note below.
+
+### The `__DIR__` trap
+
+Any moved handler that uses `__DIR__` to build a filesystem path (media
+files, uploads, logs) breaks silently unless fixed: `__DIR__` inside
+`src/<Module>/handlers.php` means that folder, not the repo root api.php/
+media.php always ran from. `handle_deletePost`'s media cleanup hit this
+exactly (fixed with `__DIR__ . '/../../' . ltrim($path, '/')`, verified
+against `realpath()` before deploying). **Grep for `__DIR__` in whatever
+you're about to move, every time** — don't assume a handler is __DIR__-free
+just because the last one was.
 
 ### Doesn't fit a single module — decide deliberately, don't default-place it
 
