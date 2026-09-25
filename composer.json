@@ -12,7 +12,8 @@
         },
         "files": [
             "src/Auth/handlers.php",
-            "src/Users/handlers.php"
+            "src/Users/handlers.php",
+            "src/Posts/handlers.php"
         ]
     }
 }
