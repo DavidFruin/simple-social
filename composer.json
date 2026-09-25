@@ -13,7 +13,8 @@
         "files": [
             "src/Auth/handlers.php",
             "src/Users/handlers.php",
-            "src/Posts/handlers.php"
+            "src/Posts/handlers.php",
+            "src/Comments/handlers.php"
         ]
     }
 }
