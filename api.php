@@ -333,52 +333,8 @@ function handle_deleteAccount($pdo, $user) {
     respond(good(['message' => 'Account deleted successfully']));
 }
 
-function handle_getMyFollowers($pdo, $user) {
-    $targetId = isset($_POST['userId']) ? (int)$_POST['userId'] : $user['sub'];
-    if ($targetId <= 0) bad('Invalid user ID', 400);
-    
-    $stmt = $pdo->prepare('SELECT id, email, follows FROM users WHERE id != ?');
-    $stmt->execute([$targetId]);
-    $followers = [];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $followsData = $row['follows'] ? json_decode($row['follows'], true) : [];
-        foreach ($followsData as $f) {
-            if ((is_array($f) ? $f['id'] : $f) == $targetId) {
-                $followers[] = ['id' => $row['id'], 'email' => $row['email'], 'timestamp' => is_array($f) ? $f['timestamp'] : 'Unknown'];
-                break;
-            }
-        }
-    }
-    respond(good(['followers' => $followers]));
-}
-
-function handle_getMyFollows($pdo, $user) {
-    $targetId = isset($_POST['userId']) ? (int)$_POST['userId'] : $user['sub'];
-    if ($targetId <= 0) bad('Invalid user ID', 400);
-    
-    $stmt = $pdo->prepare('SELECT follows FROM users WHERE id = ?');
-    $stmt->execute([$targetId]);
-    $followsJson = $stmt->fetchColumn() ?: '[]';
-    $followsData = json_decode($followsJson, true) ?? [];
-    $result = [];
-    $ids = array_map(fn($f) => is_array($f) ? $f['id'] : $f, $followsData);
-
-    if (!empty($ids)) {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($users as $u) {
-            foreach ($followsData as $f) {
-                if ((is_array($f) ? $f['id'] : $f) == $u['id']) {
-                    $result[] = ['id' => $u['id'], 'email' => $u['email'], 'timestamp' => is_array($f) ? $f['timestamp'] : 'Unknown'];
-                    break;
-                }
-            }
-        }
-    }
-    respond(good(['follows' => $result]));
-}
+// handle_getMyFollowers, handle_getMyFollows moved to
+// src/Follows/handlers.php.
 
 function handle_getNotifications($pdo, $user) {
     $offset = isset($_POST['offset']) ? (int)$_POST['offset'] : 0;
@@ -475,66 +431,8 @@ function handle_deletePushSubscription($pdo, $user) {
 // module -- see that file's header comment; corrects an omission in the
 // original split-backend-modules.md).
 
-function handle_followUser($pdo, $user) {
-    $targetId = (int)($_POST['userId'] ?? 0);
-    if ($targetId <= 0 || $targetId == $user['sub']) bad('Invalid user ID', 400);
-
-    $uid = $user['sub'];
-    $stmt = $pdo->prepare('SELECT follows, email FROM users WHERE id = ?');
-    $stmt->execute([$uid]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    $followsJson = $row['follows'] ?: '[]';
-    $actorEmail = $row['email'];
-    $follows = json_decode($followsJson, true) ?? [];
-
-    $already = false;
-    foreach ($follows as $f) if ((is_array($f) ? $f['id'] : $f) == $targetId) $already = true;
-    if (!$already) {
-        $follows[] = ['id' => $targetId, 'timestamp' => date('Y-m-d H:i:s')];
-        $stmt = $pdo->prepare('UPDATE users SET follows = ? WHERE id = ?');
-        $stmt->execute([json_encode($follows), $uid]);
-        createNotification($pdo, $targetId, $uid, $actorEmail, 'follow');
-    }
-
-    respond(good(['following' => true]));
-}
-
-function handle_unfollowUser($pdo, $user) {
-    $targetId = (int)($_POST['userId'] ?? 0);
-    if ($targetId <= 0 || $targetId == $user['sub']) bad('Invalid user ID', 400);
-
-    $uid = $user['sub'];
-    $stmt = $pdo->prepare('SELECT follows, email FROM users WHERE id = ?');
-    $stmt->execute([$uid]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    $followsJson = $row['follows'] ?: '[]';
-    $actorEmail = $row['email'];
-    $follows = json_decode($followsJson, true) ?? [];
-
-    $follows = array_filter($follows, fn($f) => (is_array($f) ? $f['id'] : $f) != $targetId);
-    $follows = array_values($follows);
-    $stmt = $pdo->prepare('UPDATE users SET follows = ? WHERE id = ?');
-    $stmt->execute([json_encode($follows), $uid]);
-
-    createNotification($pdo, $targetId, $uid, $actorEmail, 'unfollow');
-
-    respond(good(['following' => false]));
-}
-
-function handle_isFollowing($pdo, $user) {
-    $targetId = (int)($_POST['userId'] ?? 0);
-    if ($targetId <= 0 || $targetId == $user['sub']) bad('Invalid user ID', 400);
-
-    $stmt = $pdo->prepare('SELECT follows FROM users WHERE id = ?');
-    $stmt->execute([$user['sub']]);
-    $followsJson = $stmt->fetchColumn() ?: '[]';
-    $follows = json_decode($followsJson, true) ?? [];
-
-    $is = false;
-    foreach ($follows as $f) if ((is_array($f) ? $f['id'] : $f) == $targetId) $is = true;
-
-    respond(good(['following' => $is]));
-}
+// handle_followUser, handle_unfollowUser, handle_isFollowing moved to
+// src/Follows/handlers.php.
 
 // handle_deletePost moved to src/Posts/handlers.php. NOTE: its __DIR__
 // media-path resolution had to be adjusted there, since __DIR__ now means
